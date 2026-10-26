@@ -254,3 +254,10 @@ body{background:var(--canvas)}
  .heading-actions{flex-wrap:wrap}
  .heading-actions .btn{flex:1}
 }
+
+
+/* Financial report KPIs expand to cover revenue, cash results, and receivables. */
+.report-summary{grid-template-columns:repeat(3,minmax(0,1fr))}
+.report-card.emphasis b.negative{color:#bd6658}
+@media(max-width:900px){.report-summary{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:560px){.report-summary{grid-template-columns:1fr}}
