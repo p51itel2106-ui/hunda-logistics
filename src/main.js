@@ -177,7 +177,7 @@ async function loadCustomerData() {
     api("customer_quotes?select=*&order=created_at.desc"),
     accountAdminRequest({ action: "list" })
   ]);
-  state.customerOrders = orders || []; state.orders = state.customerOrders; state.documents = documents || []; state.quotes = quotes || []; state.managedAccounts = managedAccounts?.accounts || [];
+  state.customerOrders = orders || []; state.orders = state.customerOrders; state.documents = documents || []; state.quotes = quotes || []; state.managedAccounts = managedAccounts?.accounts || []; state.managedAccounts = managedAccounts?.accounts || [];
 }
 async function switchToCustomerWorkspace() {
   try {
@@ -523,7 +523,8 @@ async function loadData() {
     api("order_documents?select=*,order:orders(code)&order=created_at.desc"),
     api("activity_log?select=*&order=occurred_at.desc&limit=200"),
     api("customer_accounts?select=user_id,customer_id,full_name&order=created_at.desc"),
-    api("customer_quotes?select=*&order=created_at.desc")
+    api("customer_quotes?select=*&order=created_at.desc"),
+    accountAdminRequest({ action: "list" })
   ]);
   state.customers = customers || []; state.orders = orders || []; state.transactions = transactions || []; state.documents = documents || []; state.activity = activity || []; state.customerAccounts = customerAccounts || []; state.quotes = quotes || [];
 }
