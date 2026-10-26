@@ -100,3 +100,52 @@ body{background:var(--canvas)}
 .live-badge{display:inline-flex;align-items:center;gap:8px;padding:8px 11px;border:1px solid #dcece1;border-radius:20px;background:#f3faf5;color:#42835b;font-size:10px;font-weight:600}.live-badge i,.activity-live-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#50ad70;box-shadow:0 0 0 3px #e4f4e9}.activity-note{display:flex;align-items:center;gap:13px;padding:14px 16px;background:#f1f8f3;border:1px solid #e1eee4;border-radius:9px;margin-bottom:14px}.activity-note>div{flex:1;display:grid;gap:4px}.activity-note b{font-size:11px;color:#365b42}.activity-note span:not(.activity-live-dot){font-size:9px;color:#778c7d}.activity-count{font-size:10px;color:#506254;font-weight:600}.activity-retention{font-size:9px;color:#89968d}.activity-table{min-width:900px}.activity-table th,.activity-table td{padding:12px 14px}.activity-table tbody td{font-size:9px;vertical-align:top}.activity-table tbody td>b{font-size:10px}.activity-table .subline{white-space:normal;max-width:255px;line-height:1.5}.activity-action{display:inline-flex;padding:4px 7px;border-radius:5px;font-size:9px;font-weight:700}.activity-action.created{background:#e8f5ec;color:#398252}.activity-action.updated{background:#eef3fa;color:#597da8}.activity-action.deleted{background:#fbefed;color:#b85e53}.activity-action+.subline{margin-top:5px!important}.activity-table td:nth-child(5){font-family:ui-monospace,SFMono-Regular,Consolas,monospace;color:#5d6c62}@media(max-width:700px){.activity-note{align-items:flex-start;flex-wrap:wrap}.activity-note .btn{margin-left:auto}.activity-retention{display:none}}
 .customer-app .page-content{max-width:1250px}.customer-app .sidebar .workspace small{color:#ffc38a}.customer-app .sidebar .nav-item.active{background:#174a37}.customer-app .customer-stats{grid-template-columns:repeat(4,minmax(0,1fr))}.customer-table-panel,.customer-documents-panel{margin-bottom:15px}.customer-empty{min-height:220px}.customer-footer-note{font-size:9px;color:#91a097;margin:14px 2px 0}.customer-app .page-heading p{max-width:650px}@media(max-width:900px){.customer-app .customer-stats{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:600px){.customer-app .page-content{padding:23px 15px 38px}.customer-app .page-heading{align-items:flex-start;flex-direction:column}.customer-app .topbar{padding:0 14px}.customer-app .top-actions{gap:7px}.customer-app .top-actions .sync-label{display:none}.customer-app .top-actions .btn{font-size:9px;padding:0 8px}.customer-app .customer-stats{gap:9px}.customer-app .stat-card{padding:13px}.customer-app .customer-table-panel>.panel-heading,.customer-app .customer-documents-panel>.panel-heading{padding:15px}.customer-app .welcome-strip{align-items:flex-start}.customer-app .welcome-link{margin-left:auto}}
 .live-badge.connected{background:#effaf2;border-color:#d6ebdc;color:#367c4f}.live-badge:not(.connected){background:#faf8f2;border-color:#efe8d1;color:#9a7c35}.live-badge:not(.connected) i{background:#d9ae4f;box-shadow:0 0 0 3px #faf2d9}
+
+/* Auth refresh: full-bleed logistics imagery and balanced brand typography */
+.auth-left{
+  isolation:isolate;
+  background:
+    linear-gradient(90deg,rgba(7,25,40,.88) 0%,rgba(8,34,53,.72) 55%,rgba(8,34,53,.56) 100%),
+    linear-gradient(0deg,rgba(7,25,40,.44),rgba(7,25,40,.18)),
+    url('/assets/hunda-logistics-banner.jpg') center/cover no-repeat;
+  padding:clamp(36px,6vw,78px);
+}
+.auth-left:after{z-index:-1;right:-220px;bottom:-95px;border-color:rgba(255,255,255,.1);box-shadow:0 0 0 55px rgba(255,255,255,.035),0 0 0 110px rgba(255,255,255,.025)}
+.auth-copy{max-width:560px;margin:auto 0; text-shadow:0 2px 18px rgba(0,0,0,.2)}
+.auth-copy .eyebrow{color:#b4dff0;letter-spacing:2px}
+.auth-copy h1{font-size:clamp(36px,4.2vw,58px);line-height:1.12;letter-spacing:-1.8px;margin:19px 0}
+.auth-copy h1 em{color:#9edcf2}
+.auth-copy p{max-width:430px;color:rgba(255,255,255,.87);font-size:14px;line-height:1.85}
+.auth-proof{color:#e0edf3}
+.auth-proof svg{color:#9edcf2}
+.auth-foot{color:rgba(255,255,255,.72)}
+.auth-brand{
+  width:min(440px,100%);height:112px;margin:14px auto 0;
+  display:flex;justify-content:center;align-items:center;gap:17px;
+  border:0;border-radius:0;background:transparent;box-shadow:none;
+}
+.auth-brand img{width:70px;height:70px;max-height:none;object-fit:contain;border-radius:0}
+.auth-brand-copy{text-align:left}
+.auth-brand-copy>b{display:block;font:800 25px/1 Manrope,sans-serif;letter-spacing:1.5px;color:#182d3c}
+.auth-brand-copy>b em{font-style:normal;color:#f47716}
+.auth-brand-copy>small{display:block;margin-top:8px;color:#65747d;font-size:9px;font-weight:700;letter-spacing:2.2px}
+.auth-brand-copy>small i{font-style:normal;color:#f47716;padding:0 3px}
+.auth-content-wrap{padding-top:0}
+@media(max-width:850px){
+ .auth-page{grid-template-columns:1fr}
+ .auth-left{display:flex;min-height:380px;padding:38px 7% 25px;gap:25px}
+ .auth-copy{margin:auto 0}
+ .auth-right{min-height:auto;padding:0 7% 42px}
+ .auth-brand{height:108px;margin:0 auto 10px}
+ .auth-content-wrap{padding:0 0 20px}
+}
+@media(max-width:600px){
+ .auth-left{min-height:350px;padding:30px 22px 20px;gap:17px}
+ .auth-copy h1{font-size:35px}
+ .auth-copy p{font-size:12px}
+ .auth-proof{gap:13px;flex-wrap:wrap;margin-top:18px}
+ .auth-brand{height:96px;gap:13px}
+ .auth-brand img{width:58px;height:58px}
+ .auth-brand-copy>b{font-size:21px}
+ .auth-brand-copy>small{font-size:8px;letter-spacing:1.6px}
+}
