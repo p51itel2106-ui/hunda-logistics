@@ -246,11 +246,11 @@ function customerQuotesPanel() {
   }).join("");
   return '<section class="panel customer-quotes-panel"><div class="panel-heading"><div><h2>Tạo báo giá</h2><p>Gửi thông số hàng hóa để Hunda kiểm tra và chốt giá cuối cùng.</p></div></div>' +
     '<form id="customer-quote-form" class="customer-quote-form"><div class="customer-quote-fields">' +
-    '<label class="quote-field"><span>Khối lượng thực tế (kg)</span><input id="quote-kgs" type="number" min="0" step="0.001" value="" + escapeHTML(state.quoteDraft?.actual ?? "0") + "" inputmode="decimal"></label>' +
-    '<label class="quote-field"><span>Thể tích hàng (CBM)</span><input id="quote-cbm" type="number" min="0" step="0.0001" value="" + escapeHTML(state.quoteDraft?.cbm ?? "0") + "" inputmode="decimal"></label></div>' +
+    '<label class="quote-field"><span>Khối lượng thực tế (kg)</span><input id="quote-kgs" type="number" min="0" step="0.001" value="' + escapeHTML(state.quoteDraft?.actual ?? "0") + '" inputmode="decimal"></label>' +
+    '<label class="quote-field"><span>Thể tích hàng (CBM)</span><input id="quote-cbm" type="number" min="0" step="0.0001" value="' + escapeHTML(state.quoteDraft?.cbm ?? "0") + '" inputmode="decimal"></label></div>' +
     '<p class="quote-formula">Trọng lượng quy đổi = CBM × 250. Trọng lượng tính giá là số lớn hơn giữa kg thực tế và kg quy đổi.</p>' +
     '<div class="quote-calc-grid"><div><span>Kg quy đổi (x)</span><b id="quote-volume-weight">0 kg</b></div><div><span>Trọng lượng tính giá</span><b id="quote-chargeable-weight">0 kg</b></div><div class="quote-total"><span>Giá tạm tính (e = kg tính giá × 7,75)</span><b id="quote-estimate-cny">0,00 ¥</b></div></div>' +
-    '<label class="quote-convert"><input id="quote-convert-vnd" type="checkbox" " + (state.quoteDraft?.convert ? "checked" : "") + "><span>Hiển thị thêm VND theo tỷ giá 1 CNY = 3.950 VND</span></label>' +
+    '<label class="quote-convert"><input id="quote-convert-vnd" type="checkbox" ' + (state.quoteDraft?.convert ? "checked" : "") + '><span>Hiển thị thêm VND theo tỷ giá 1 CNY = 3.950 VND</span></label>' +
     '<div class="quote-vnd-result" id="quote-vnd-result" hidden><span>Giá tạm tính quy đổi (t = e × 3.950)</span><b id="quote-estimate-vnd">0 ₫</b></div>' +
     '<div class="quote-submit-row"><span>Báo giá sẽ ở trạng thái chờ quản trị viên phê duyệt.</span><button type="submit" class="btn primary">' + icon("arrow", 15) + ' Gửi yêu cầu báo giá</button></div></form>' +
     '<div class="panel-heading quote-history-heading"><div><h2>Lịch sử báo giá</h2><p>Giá cuối cùng chỉ được áp dụng sau khi Hunda phê duyệt.</p></div></div>' +
