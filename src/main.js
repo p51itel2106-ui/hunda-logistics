@@ -420,6 +420,11 @@ function action(actionName, id) {
   if (actionName === "delete-order") return confirmDelete("đơn hàng", id, "orders");
   if (actionName === "new-customer") return customerModal();
   if (actionName === "new-account") return managedAccountModal();
+  if (actionName === "wallet-deposit") return walletTransactionModal("deposit");
+  if (actionName === "wallet-withdraw") return walletTransactionModal("withdrawal");
+  if (actionName === "wallet-settings") return walletSettingsModal();
+  if (actionName === "wallet-approve") return reviewWalletTransaction(id, true);
+  if (actionName === "wallet-reject") return reviewWalletTransaction(id, false);
   if (actionName === "edit-customer") return customerModal(state.customers.find(c => c.id === id));
   if (actionName === "delete-customer") return confirmDelete("khách hàng", id, "customers");
   if (actionName === "new-transaction") return transactionModal();
@@ -445,6 +450,33 @@ function customerOrderModal(quoteId = "") {
   const fields = `${selectInput("quote_id", "Báo giá đã được duyệt", quoteOptions, selectedQuoteId, true)}${quoteNotice}${textInput("route", "Tuyến vận chuyển", "", "VD: TP. Hồ Chí Minh → Hà Nội", "text", true)}${textInput("cargo_description", "Mô tả hàng hóa", "", "Tên hàng, số kiện, khối lượng...")}${textareaInput("note", "Yêu cầu xử lý", "", "Thời gian, lưu ý nhận hàng hoặc yêu cầu khác")}`;
   openModal("Gửi yêu cầu đơn hàng", formShell("customer-order", "", fields), "Gửi yêu cầu");
 }
+function walletTransactionModal(type) {
+  const deposit = type === "deposit";
+  const bank = state.wallet?.bank || {};
+  const memo = `${bank.transfer_note || "HUNDA"}-${String(state.user?.id || "").slice(0, 8).toUpperCase()}`;
+  const bankDetails = bank.bank_name && bank.bank_account && bank.bank_holder
+    ? `<div class="wallet-bank-info"><b>${escapeHTML(bank.bank_name)}</b><span>Chủ tài khoản: ${escapeHTML(bank.bank_holder)}</span><strong>${escapeHTML(bank.bank_account)}</strong><span>Nội dung chuyển khoản: <b>${escapeHTML(memo)}</b></span></div>`
+    : `<div class="wallet-bank-info pending"><b>Tài khoản nhận tiền đang chờ cấu hình.</b><span>Vui lòng liên hệ Hunda trước khi chuyển khoản.</span></div>`;
+  const fields = deposit
+    ? `${field("Chuyển khoản đến", bankDetails, true)}${textInput("amount", "Số tiền nạp (VND) *", "", "Ví dụ: 500000", "number", true)}${field("Xác nhận", `<p class="form-hint">Sau khi chuyển khoản, gửi yêu cầu để Hunda xác nhận. Số dư chỉ tăng khi quản trị viên duyệt.</p>`, true)}`
+    : `${field("Số dư khả dụng", `<p class="wallet-available">${money(state.wallet?.balance || 0)}</p>`)}${field("Số tiền rút (VND) *", `<input name="amount" type="number" min="100000" step="1000" placeholder="Tối thiểu 100.000đ" required />`)}${textInput("bank_name", "Ngân hàng nhận *", "", "Tên ngân hàng", "text", true)}${textInput("bank_account", "Số tài khoản nhận *", "", "Số tài khoản", "text", true)}${textInput("bank_holder", "Chủ tài khoản nhận *", "", "Họ tên chủ tài khoản", "text", true)}${field("Lưu ý", `<p class="form-hint">Mỗi lần rút tối thiểu 100.000đ. Số tiền sẽ được giữ chỗ trong khi quản trị viên xử lý.</p>`, true)}`;
+  openModal(deposit ? "Nạp tiền vào ví" : "Yêu cầu rút tiền", formShell(deposit ? "wallet-deposit" : "wallet-withdrawal", "", fields), deposit ? "Tôi đã chuyển khoản" : "Gửi yêu cầu rút");
+}
+function walletSettingsModal() {
+  const bank = state.walletAdmin?.bank || {};
+  const fields = `${textInput("bank_name", "Ngân hàng", bank.bank_name || "", "Tên ngân hàng", "text", true)}${textInput("bank_account", "Số tài khoản", bank.bank_account || "", "Số tài khoản nhận tiền", "text", true)}${textInput("bank_holder", "Tên chủ tài khoản", bank.bank_holder || "", "Tên trên tài khoản ngân hàng", "text", true)}${textInput("transfer_note", "Tiền tố nội dung chuyển khoản", bank.transfer_note || "HUNDA", "HUNDA", "text", true)}${field("Hiển thị cho khách hàng", `<p class="form-hint">Thông tin này sẽ xuất hiện khi khách hàng chọn Nạp tiền.</p>`, true)}`;
+  openModal("Cấu hình tài khoản nhận tiền", formShell("wallet-settings", "", fields), "Lưu thông tin");
+}
+async function reviewWalletTransaction(id, approve) {
+  const label = approve ? "duyệt" : "từ chối";
+  if (!window.confirm(`Bạn có chắc muốn ${label} yêu cầu giao dịch này?`)) return;
+  try {
+    await walletRequest({ action: "admin-review", transaction_id: id, approve });
+    await loadData();
+    render();
+    showToast(approve ? "Đã duyệt giao dịch ví." : "Đã từ chối và cập nhật số dư.");
+  } catch (error) { fail(error); }
+}
 function managedAccountModal() {
   const roles = `<option value="customer" selected>Khách hàng — chỉ xem hồ sơ và đơn hàng của mình</option><option value="admin">Quản trị viên — quản lý toàn bộ hệ thống</option>`;
   const fields = `${selectInput("role", "Vai trò truy cập", roles, "customer", true)}${textInput("full_name", "Họ và tên", "", "Nguyễn Văn An", "text", true)}${textInput("email", "Email đăng nhập", "", "email@congty.vn", "email", true)}${textInput("phone", "Số điện thoại", "", "09xx xxx xxx", "tel")}${textInput("company", "Tên công ty", "", "Tên doanh nghiệp")}${textInput("password", "Mật khẩu khởi tạo", "", "Tối thiểu 8 ký tự", "password", true)}${field("Phân quyền", `<p class="form-hint">Quản trị viên được quản lý toàn bộ dữ liệu vận hành. Khách hàng chỉ truy cập hồ sơ và đơn hàng của mình.</p>`, true)}`;
@@ -465,7 +497,13 @@ function documentModal(document, orderId = "") {
 async function handleRecordSubmit(e) {
   e.preventDefault(); const form = e.currentTarget; const data = new FormData(form); const kind = form.dataset.kind; const id = form.dataset.id; const button = document.querySelector(".modal-foot [type=submit]"); button.disabled = true; button.innerHTML = '<span class="spinner"></span> Đang lưu';
   try {
-    if (kind === "managed-account") {
+    if (kind === "wallet-settings") {
+      const result = await walletRequest({ action: "admin-settings", settings: { bank_name: String(data.get("bank_name") || "").trim(), bank_account: String(data.get("bank_account") || "").trim(), bank_holder: String(data.get("bank_holder") || "").trim(), transfer_note: String(data.get("transfer_note") || "HUNDA").trim() } });
+      if (!result?.bank) throw new Error("Máy chủ chưa xác nhận thông tin nhận tiền.");
+    } else if (kind === "wallet-deposit" || kind === "wallet-withdrawal") {
+      const result = await walletRequest({ action: "request", transaction_type: kind === "wallet-deposit" ? "deposit" : "withdrawal", amount: Number(data.get("amount")), bank_name: String(data.get("bank_name") || "").trim(), bank_account: String(data.get("bank_account") || "").trim(), bank_holder: String(data.get("bank_holder") || "").trim(), note: kind === "wallet-deposit" ? `${state.wallet?.bank?.transfer_note || "HUNDA"}-${String(state.user?.id || "").slice(0, 8).toUpperCase()}` : "" });
+      if (!result?.transaction_id) throw new Error("Máy chủ chưa tiếp nhận yêu cầu.");
+    } else if (kind === "managed-account") {
       const result = await accountAdminRequest({ action: "create", account: { role: String(data.get("role")), full_name: String(data.get("full_name") || "").trim(), email: String(data.get("email") || "").trim(), phone: String(data.get("phone") || "").trim(), company: String(data.get("company") || "").trim(), password: String(data.get("password") || "") } });
       if (!result?.account?.user_id) throw new Error("Máy chủ chưa xác nhận tài khoản mới.");
     } else if (kind === "document") await uploadDocument(data);
@@ -488,7 +526,7 @@ async function handleRecordSubmit(e) {
       if (id) await api(`${kind === "order" ? "orders" : kind === "customer" ? "customers" : "transactions"}?id=eq.${id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify(record) });
       else await api(kind === "order" ? "orders" : kind === "customer" ? "customers" : "transactions", { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify(record) });
     }
-    closeModal(); if (state.workspace === "customer") await loadCustomerData(); else await loadData(); render(); showToast(kind === "managed-account" ? "Đã cấp tài khoản và đồng bộ hồ sơ lên máy chủ." : "Đã lưu và đồng bộ dữ liệu.");
+    closeModal(); if (state.workspace === "customer") { await loadCustomerData(); if (kind === "wallet-deposit" || kind === "wallet-withdrawal") await loadWalletSnapshot(); } else await loadData(); render(); showToast(kind === "managed-account" ? "Đã cấp tài khoản và đồng bộ hồ sơ lên máy chủ." : kind === "wallet-settings" ? "Đã lưu tài khoản nhận tiền." : kind === "wallet-deposit" || kind === "wallet-withdrawal" ? "Yêu cầu đã gửi để quản trị viên xác nhận." : "Đã lưu và đồng bộ dữ liệu.");
   } catch (error) { fail(error); button.disabled = false; button.innerHTML = "Thử lại"; }
 }
 async function uploadDocument(form) {
