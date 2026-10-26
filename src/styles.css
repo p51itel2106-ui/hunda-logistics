@@ -197,3 +197,34 @@ body{background:var(--canvas)}
  .auth-brand-copy>b{font-size:21px}
  .auth-brand-copy>small{font-size:8px;letter-spacing:1.6px}
 }
+
+/* Customer quotation workflow */
+.customer-quotes-panel,.customer-table-panel,.customer-documents-panel{scroll-margin-top:22px}
+.customer-quote-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.quote-field{display:grid;gap:7px;color:#56636a;font-size:11px;font-weight:600}
+.quote-field input{height:42px;padding:0 12px;border:1px solid #dce4df;border-radius:7px;background:#fff;color:#172b3d;font:inherit}
+.quote-field input:focus{outline:2px solid rgba(244,119,22,.2);border-color:#f47716}
+.quote-formula{margin:12px 0;color:#77838a;font-size:10px;line-height:1.6}
+.quote-calc-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.quote-calc-grid>div{display:grid;gap:8px;padding:13px;border:1px solid #e8ece9;border-radius:8px;background:#fafbf9}
+.quote-calc-grid span,.quote-vnd-result span{font-size:10px;color:#78847e}
+.quote-calc-grid b{font-size:17px;color:#172b3d}
+.quote-calc-grid .quote-total{background:#fff5eb;border-color:#ffdec2}
+.quote-calc-grid .quote-total b{color:#e66e10}
+.quote-convert{display:flex;align-items:center;gap:9px;margin:14px 0;color:#425b4b;font-size:11px}
+.quote-convert input{accent-color:#f47716;width:15px;height:15px}
+.quote-vnd-result{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;margin-bottom:12px;border:1px solid #e5eee7;background:#f4faf5;border-radius:8px}
+.quote-vnd-result[hidden]{display:none}
+.quote-vnd-result b{font-size:16px;color:#3b8557}
+.quote-submit-row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding-top:12px;border-top:1px solid #eef0ed}
+.quote-submit-row>span{font-size:10px;color:#78847e}
+.quote-history-heading{margin-top:22px;padding-top:18px;border-top:1px solid #edf0ed}
+.quote-status{display:inline-flex;padding:5px 8px;border-radius:20px;font-size:9px;font-weight:700;white-space:nowrap}
+.quote-status.pending{background:#fff4df;color:#a46a15}
+.quote-status.approved{background:#e8f5ec;color:#398252}
+.quote-finalized{font-size:10px;color:#64816c}
+@media(max-width:720px){
+ .customer-quote-fields,.quote-calc-grid{grid-template-columns:1fr}
+ .quote-submit-row{align-items:flex-start;flex-direction:column}
+ .quote-submit-row .btn{width:100%;justify-content:center}
+}
