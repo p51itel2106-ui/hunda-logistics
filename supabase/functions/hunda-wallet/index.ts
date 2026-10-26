@@ -40,7 +40,7 @@ Deno.serve(async (req: Request) => {
       const [{ data: wallet, error: walletError }, { data: transactions, error: transactionError }, { data: bank, error: bankError }] = await Promise.all([
         adminClient.from("user_wallets").select("balance").eq("user_id", user.id).maybeSingle(),
         adminClient.from("wallet_transactions").select("id,transaction_type,amount,status,bank_name,bank_account,bank_holder,note,admin_note,created_at,decided_at").eq("user_id", user.id).order("created_at", { ascending: false }).limit(30),
-        adminClient.from("wallet_settings").select("bank_name,bank_account,bank_holder,transfer_note").eq("id", 1).maybeSingle(),
+        adminClient.from("wallet_settings").select("bank_name,bank_code,bank_account,bank_holder,transfer_note").eq("id", 1).maybeSingle(),
       ]);
       if (walletError) throw walletError;
       if (transactionError) throw transactionError;
@@ -56,9 +56,9 @@ Deno.serve(async (req: Request) => {
       if (transactionType === "withdrawal" && amount < 100000) return json({ error: "Mỗi lần rút tối thiểu 100.000đ." }, 400);
 
       if (transactionType === "deposit") {
-        const { data: bank, error } = await adminClient.from("wallet_settings").select("bank_name,bank_account,bank_holder").eq("id", 1).maybeSingle();
+        const { data: bank, error } = await adminClient.from("wallet_settings").select("bank_name,bank_code,bank_account,bank_holder").eq("id", 1).maybeSingle();
         if (error) throw error;
-        if (!bank?.bank_name || !bank?.bank_account || !bank?.bank_holder) {
+        if (!bank?.bank_name || !bank?.bank_code || !bank?.bank_account || !bank?.bank_holder) {
           return json({ error: "Tài khoản ngân hàng nhận tiền chưa được quản trị viên cấu hình." }, 409);
         }
       }
@@ -72,9 +72,28 @@ Deno.serve(async (req: Request) => {
         p_bank_name: transactionType === "withdrawal" ? body.bank_name : null,
         p_bank_account: transactionType === "withdrawal" ? body.bank_account : null,
         p_bank_holder: transactionType === "withdrawal" ? body.bank_holder : null,
-        p_note: body.note || null,
+        p_note: transactionType === "deposit" ? null : body.note || null,
       });
       if (error) return json({ error: error.message }, 400);
+      if (transactionType === "deposit") {
+        const [{ data: transaction, error: transactionError }, { data: bank, error: bankError }] = await Promise.all([
+          adminClient.from("wallet_transactions").select("transfer_code").eq("id", transactionId).single(),
+          adminClient.from("wallet_settings").select("bank_name,bank_code,bank_account,bank_holder").eq("id", 1).single(),
+        ]);
+        if (transactionError) throw transactionError;
+        if (bankError) throw bankError;
+        const params = new URLSearchParams({
+          acc: bank.bank_account,
+          bank: bank.bank_code,
+          amount: String(amount),
+          des: transaction.transfer_code,
+          template: "compact",
+          showinfo: "true",
+          fullacc: "true",
+          holder: bank.bank_holder,
+        });
+        return json({ transaction_id: transactionId, transfer_code: transaction.transfer_code, qr_url: "https://vietqr.app/img?" + params.toString(), bank }, 201);
+      }
       return json({ transaction_id: transactionId }, 201);
     }
 
@@ -83,7 +102,7 @@ Deno.serve(async (req: Request) => {
     if (action === "admin-list") {
       const [{ data: requests, error: requestsError }, { data: bank, error: bankError }, { data: usersResult, error: usersError }, { data: profiles, error: profilesError }] = await Promise.all([
         adminClient.from("wallet_transactions").select("*").order("created_at", { ascending: false }).limit(200),
-        adminClient.from("wallet_settings").select("bank_name,bank_account,bank_holder,transfer_note").eq("id", 1).maybeSingle(),
+        adminClient.from("wallet_settings").select("bank_name,bank_code,bank_account,bank_holder,transfer_note").eq("id", 1).maybeSingle(),
         adminClient.auth.admin.listUsers({ page: 1, perPage: 1000 }),
         adminClient.from("customer_accounts").select("user_id,full_name"),
       ]);
@@ -116,6 +135,7 @@ Deno.serve(async (req: Request) => {
     if (action === "admin-settings") {
       const settings = {
         bank_name: String(body?.settings?.bank_name || "").trim(),
+        bank_code: String(body?.settings?.bank_code || "").trim(),
         bank_account: String(body?.settings?.bank_account || "").trim(),
         bank_holder: String(body?.settings?.bank_holder || "").trim(),
         transfer_note: String(body?.settings?.transfer_note || "HUNDA").trim().slice(0, 80),
