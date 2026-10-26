@@ -41,3 +41,59 @@ body{background:var(--canvas)}
 .setup-steps b,.setup-note svg{color:#e97820}
 .top-avatar{background:#fff1e5;color:#d9680e}
 @media(max-width:850px){.auth-mobile-logo{display:flex}.auth-mobile-logo img{width:184px}}
+
+/* Balanced sign-in layout with Hunda freight imagery and account recovery. */
+.auth-left{display:grid;grid-template-rows:1fr auto auto;gap:25px;padding:38px 7% 25px;background:#132438}
+.auth-left:after{pointer-events:none;right:-240px;bottom:95px}
+.auth-copy{align-self:end;width:min(490px,100%);margin:0 auto;z-index:2}
+.auth-copy h1{font-size:clamp(30px,3.4vw,46px)}
+.auth-visual{position:relative;z-index:2;width:min(490px,100%);margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:11px}
+.auth-photo{position:relative;min-height:125px;overflow:hidden;border:1px solid rgba(255,255,255,.18);border-radius:11px;background-image:linear-gradient(180deg,rgba(12,29,47,.04) 28%,rgba(12,29,47,.8) 100%),url('/assets/hunda-logistics-banner.jpg');background-repeat:no-repeat;background-size:300% 300%;box-shadow:0 12px 28px rgba(3,16,28,.25)}
+.auth-photo-truck{background-position:10% 84%}
+.auth-photo-ship{background-position:95% 65%}
+.auth-photo>span{position:absolute;left:10px;bottom:9px;display:flex;align-items:center;gap:6px;color:#fff;font-size:8px;font-weight:700;letter-spacing:.55px;text-shadow:0 1px 4px rgba(0,0,0,.45)}
+.auth-photo>span svg{color:#ff9a45}
+.auth-right{grid-template-rows:auto 1fr;align-content:stretch;min-height:100vh;padding:12px 7% 30px}
+.auth-brand{justify-self:center;display:grid;place-items:center;width:min(360px,100%);height:178px;margin:0;padding:0;background:transparent;box-shadow:none}
+.auth-brand img{width:min(280px,92%);max-height:160px;object-fit:contain;border-radius:8px}
+.auth-content-wrap{width:100%;display:grid;place-items:center;padding:4px 0 35px}
+.auth-form-wrap{width:min(440px,100%)}
+.auth-form-wrap>h2{margin-top:8px}
+.auth-form-wrap form{gap:12px}
+.auth-fields{display:grid;grid-template-columns:1fr 1fr;gap:12px 13px}
+.auth-field-wide{grid-column:1/-1}
+.invoice-heading{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin:19px 0 10px;padding-top:15px;border-top:1px solid #edf0ed}
+.invoice-heading b{font:700 11px Manrope,sans-serif;color:#34463b}
+.invoice-heading span{font-size:9px;color:#98a39b}
+.forgot-link{justify-self:end;margin-top:-8px;border:0;background:none;padding:1px 0;color:#d9680e;font-size:10px;font-weight:600}
+.forgot-link:hover{text-decoration:underline;color:#a94d04}
+.auth-form-wrap .auth-fields input{width:100%}
+.form-alert.success{border-color:#d8ebdd;background:#f1f8f2;color:#39704b}
+.auth-safe{margin-top:19px}
+@media(max-width:850px){
+  .auth-page{grid-template-columns:1fr}
+  .auth-left{display:grid;grid-template-rows:auto auto auto;min-height:auto;gap:24px;padding:32px 7% 22px}
+  .auth-copy{align-self:auto;margin:0 auto}
+  .auth-visual{max-width:490px}
+  .auth-photo{min-height:115px}
+  .auth-right{min-height:auto;padding:0 7% 42px;grid-template-rows:auto auto}
+  .auth-brand{height:148px}
+  .auth-content-wrap{padding:0 0 20px}
+}
+@media(max-width:600px){
+  .auth-left{padding:27px 22px 19px;gap:19px}
+  .auth-copy h1{font-size:32px}
+  .auth-copy p{font-size:12px}
+  .auth-proof{gap:13px;flex-wrap:wrap;margin-top:19px}
+  .auth-visual{gap:8px}
+  .auth-photo{min-height:102px}
+  .auth-photo>span{font-size:7px;left:7px;bottom:7px}
+  .auth-right{padding:0 22px 32px}
+  .auth-brand{height:127px}
+  .auth-brand img{width:min(245px,91%)}
+  .auth-form-wrap{width:100%}
+  .auth-fields{gap:11px 9px}
+  .auth-fields label{font-size:9px}
+  .auth-fields input{padding:0 8px}
+  .invoice-heading{align-items:flex-start;flex-direction:column;gap:4px}
+}

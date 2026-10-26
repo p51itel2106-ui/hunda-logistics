@@ -81,7 +81,17 @@ function renderSetup() {
 
 function authShell(view = "login", message = "") {
   const signup = view === "signup";
-  root.innerHTML = `<main class="auth-page"><div class="auth-left"><div class="auth-brand"><img src="/assets/hunda-logo.jpg" alt="Hunda Bus Logistics" /></div><div class="auth-copy"><span class="eyebrow">VẬN HÀNH TRONG MỘT NƠI</span><h1>Quản lý hành trình.<br><em>Nắm chắc dòng tiền.</em></h1><p>Đơn hàng, khách hàng, chứng từ và tài chính được đồng bộ an toàn trên mọi thiết bị.</p><div class="auth-proof"><span>${icon("shield", 17)} Dữ liệu riêng tư</span><span>${icon("refresh", 17)} Đồng bộ máy chủ</span></div></div><div class="auth-foot">© ${new Date().getFullYear()} Hunda Logistics</div></div><section class="auth-right"><div class="auth-form-wrap"><div class="auth-mobile-logo"><img src="/assets/hunda-logo.jpg" alt="Hunda Bus Logistics" /></div><span class="eyebrow">${signup ? "TẠO TÀI KHOẢN" : "KHU VỰC QUẢN TRỊ"}</span><h2>${signup ? "Bắt đầu tài khoản" : "Chào mừng trở lại"}</h2><p class="muted">${signup ? "Tạo tài khoản Hunda Logistics của bạn." : "Đăng nhập để tiếp tục công việc hôm nay."}</p>${message ? `<div class="form-alert">${escapeHTML(message)}</div>` : ""}<form id="auth-form" data-view="${signup ? "signup" : "login"}"><label>Email công việc<input name="email" type="email" autocomplete="email" placeholder="ten@congty.vn" required /></label><label>Mật khẩu<input name="password" type="password" autocomplete="${signup ? "new-password" : "current-password"}" minlength="8" placeholder="Tối thiểu 8 ký tự" required /></label>${signup ? `<label>Nhập lại mật khẩu<input name="confirm" type="password" autocomplete="new-password" minlength="8" placeholder="Nhập lại mật khẩu" required /></label>` : ""}<button class="btn primary wide" type="submit">${signup ? "Tạo tài khoản" : "Đăng nhập"}${icon("arrow", 17)}</button></form><p class="auth-switch">${signup ? "Đã có tài khoản?" : "Chưa có tài khoản?"} <button class="text-button" data-auth-view="${signup ? "login" : "signup"}">${signup ? "Đăng nhập" : "Tạo tài khoản"}</button></p><div class="auth-safe">${icon("shield", 15)} Tài khoản mới cần được quản trị viên phê duyệt quyền truy cập.</div></div></section></main><div id="toast-host" class="toast-host"></div>`;
+  const forgot = view === "forgot";
+  const reset = view === "reset";
+  const heading = signup ? "Tạo tài khoản Hunda" : forgot ? "Khôi phục mật khẩu" : reset ? "Đặt mật khẩu mới" : "Chào mừng trở lại";
+  const subheading = signup ? "Thông tin công việc và xuất hóa đơn của bạn." : forgot ? "Nhập email để nhận liên kết đặt lại mật khẩu." : reset ? "Chọn mật khẩu mới cho tài khoản của bạn." : "Đăng nhập để tiếp tục công việc hôm nay.";
+  const authFields = signup ? `<div class="auth-fields auth-fields-signup"><label>Họ và tên<input name="full_name" autocomplete="name" placeholder="Nguyễn Văn An" required /></label><label>Số điện thoại<input name="phone" type="tel" autocomplete="tel" placeholder="09xx xxx xxx" required /></label><label class="auth-field-wide">Email công việc<input name="email" type="email" autocomplete="email" placeholder="ten@congty.vn" required /></label><label>Mật khẩu<input name="password" type="password" autocomplete="new-password" minlength="8" placeholder="Tối thiểu 8 ký tự" required /></label><label>Nhập lại mật khẩu<input name="confirm" type="password" autocomplete="new-password" minlength="8" placeholder="Nhập lại mật khẩu" required /></label></div><div class="invoice-heading"><b>Thông tin xuất hóa đơn</b><span>Có thể bổ sung hoặc chỉnh sửa sau</span></div><div class="auth-fields invoice-fields"><label>Tên công ty<input name="billing_company" autocomplete="organization" placeholder="Tên công ty" /></label><label>Mã số thuế<input name="billing_tax_code" placeholder="Mã số thuế" /></label><label class="auth-field-wide">Địa chỉ xuất hóa đơn<input name="billing_address" autocomplete="street-address" placeholder="Số nhà, đường, quận/huyện, tỉnh/thành" /></label><label class="auth-field-wide">Email nhận hóa đơn<input name="billing_email" type="email" autocomplete="email" placeholder="ketoan@congty.vn" /></label></div>` : forgot ? `<label>Email công việc<input name="email" type="email" autocomplete="email" placeholder="ten@congty.vn" required /></label>` : reset ? `<label>Mật khẩu mới<input name="password" type="password" autocomplete="new-password" minlength="8" placeholder="Tối thiểu 8 ký tự" required /></label><label>Nhập lại mật khẩu<input name="confirm" type="password" autocomplete="new-password" minlength="8" placeholder="Nhập lại mật khẩu" required /></label>` : `<label>Email công việc<input name="email" type="email" autocomplete="email" placeholder="ten@congty.vn" required /></label><label>Mật khẩu<input name="password" type="password" autocomplete="current-password" minlength="8" placeholder="Mật khẩu của bạn" required /></label><button class="forgot-link" type="button" data-auth-view="forgot">Quên mật khẩu?</button>`;
+  const actionLabel = signup ? "Tạo tài khoản" : forgot ? "Gửi liên kết khôi phục" : reset ? "Cập nhật mật khẩu" : "Đăng nhập";
+  const switchView = signup ? "login" : (forgot || reset) ? "login" : "signup";
+  const switchText = signup ? "Đã có tài khoản?" : (forgot || reset) ? "Đã nhớ mật khẩu?" : "Chưa có tài khoản?";
+  const switchLabel = signup || forgot || reset ? "Đăng nhập" : "Tạo tài khoản";
+  const successMessage = /Nếu email thuộc|Mật khẩu đã được cập nhật|Tài khoản đã được tạo/.test(message);
+  root.innerHTML = `<main class="auth-page"><div class="auth-left"><div class="auth-copy"><span class="eyebrow">VẬN HÀNH TRONG MỘT NƠI</span><h1>Quản lý hành trình.<br><em>Nắm chắc dòng tiền.</em></h1><p>Đơn hàng, khách hàng, chứng từ và tài chính được đồng bộ an toàn trên mọi thiết bị.</p><div class="auth-proof"><span>${icon("shield", 17)} Dữ liệu riêng tư</span><span>${icon("refresh", 17)} Đồng bộ máy chủ</span></div></div><div class="auth-visual" aria-label="Vận tải đường bộ và đường biển"><div class="auth-photo auth-photo-truck"><span>${icon("truck", 15)} VẬN TẢI ĐƯỜNG BỘ</span></div><div class="auth-photo auth-photo-ship"><span>${icon("box", 15)} VẬN TẢI ĐƯỜNG BIỂN</span></div></div><div class="auth-foot">© ${new Date().getFullYear()} Hunda Logistics</div></div><section class="auth-right"><div class="auth-brand"><img src="/assets/hunda-logo.jpg" alt="Hunda Bus Logistics" /></div><div class="auth-content-wrap"><div class="auth-form-wrap"><span class="eyebrow">${signup ? "TẠO TÀI KHOẢN" : reset ? "BẢO MẬT TÀI KHOẢN" : forgot ? "HỖ TRỢ ĐĂNG NHẬP" : "KHU VỰC QUẢN TRỊ"}</span><h2>${heading}</h2><p class="muted">${subheading}</p>${message ? `<div class="form-alert ${successMessage ? "success" : ""}">${escapeHTML(message)}</div>` : ""}<form id="auth-form" data-view="${view}">${authFields}<button class="btn primary wide" type="submit">${actionLabel}${icon("arrow", 17)}</button></form><p class="auth-switch">${switchText} <button class="text-button" data-auth-view="${switchView}">${switchLabel}</button></p><div class="auth-safe">${icon("shield", 15)} Tài khoản mới cần được quản trị viên phê duyệt quyền truy cập.</div></div></div></section></main><div id="toast-host" class="toast-host"></div>`;
   bindAuth();
 }
 
@@ -286,10 +296,19 @@ async function signIn(email, password) {
   const ok = await checkAdmin(); if (!ok) return renderPending(state.user?.email);
   await enterApp();
 }
-async function signUp(email, password) {
-  const result = await authRequest("signup", { email, password });
+async function signUp(email, password, profile) {
+  const result = await authRequest("signup", { email, password, data: profile });
   if (result.access_token) { saveSession(result); state.user = result.user || null; renderPending(state.user?.email); }
   else authShell("login", "Tài khoản đã được tạo. Hãy xác nhận email nếu hệ thống yêu cầu, sau đó đăng nhập. Quản trị viên sẽ cấp quyền truy cập.");
+}
+async function sendPasswordReset(email) {
+  const redirectTo = `${location.origin}${location.pathname}`;
+  await authRequest(`recover?redirect_to=${encodeURIComponent(redirectTo)}`, { email });
+}
+async function updatePassword(password) {
+  await request("/auth/v1/user", { method: "PUT", body: JSON.stringify({ password }) });
+  saveSession(null); state.user = null;
+  authShell("login", "Mật khẩu đã được cập nhật. Hãy đăng nhập bằng mật khẩu mới.");
 }
 async function signOut() {
   try { if (state.session?.access_token) await request("/auth/v1/logout", { method: "POST" }); } catch { /* Local sign-out still completes when the server session expired. */ }
@@ -303,19 +322,27 @@ async function enterApp() {
 function bindAuth() {
   document.querySelectorAll("[data-auth-view]").forEach(b => b.addEventListener("click", () => authShell(b.dataset.authView)));
   document.querySelector("#auth-form")?.addEventListener("submit", async e => {
-    e.preventDefault(); const f = new FormData(e.currentTarget); const email = String(f.get("email")).trim().toLowerCase(); const password = String(f.get("password")); const isSignup = e.currentTarget.dataset.view === "signup";
+    e.preventDefault(); const f = new FormData(e.currentTarget); const view = e.currentTarget.dataset.view; const email = String(f.get("email") || "").trim().toLowerCase(); const password = String(f.get("password") || ""); const isSignup = view === "signup";
     if (isSignup && password !== f.get("confirm")) return showToast("Mật khẩu nhập lại chưa khớp.", "error");
+    if (view === "reset" && password !== f.get("confirm")) return showToast("Mật khẩu nhập lại chưa khớp.", "error");
     const button = e.currentTarget.querySelector("button[type=submit]"); button.disabled = true; button.innerHTML = '<span class="spinner"></span> Đang xử lý';
-    try { if (isSignup) await signUp(email, password); else await signIn(email, password); }
-    catch (error) { authShell(isSignup ? "signup" : "login", error.message); }
+    try {
+      if (isSignup) await signUp(email, password, { full_name: String(f.get("full_name")).trim(), phone: String(f.get("phone")).trim(), billing_company: String(f.get("billing_company") || "").trim(), billing_tax_code: String(f.get("billing_tax_code") || "").trim(), billing_address: String(f.get("billing_address") || "").trim(), billing_email: String(f.get("billing_email") || "").trim().toLowerCase() });
+      else if (view === "forgot") { await sendPasswordReset(email); authShell("login", "Nếu email thuộc một tài khoản, liên kết đặt lại mật khẩu đã được gửi. Hãy kiểm tra hộp thư và thư rác."); }
+      else if (view === "reset") await updatePassword(password);
+      else await signIn(email, password);
+    }
+    catch (error) { authShell(view, error.message); }
   });
 }
 function bootstrap() {
   if (!DB_URL || !PUBLIC_KEY) return renderSetup();
   const hash = new URLSearchParams(location.hash.replace(/^#/, ""));
   if (hash.get("access_token") && hash.get("refresh_token")) {
+    const isRecovery = hash.get("type") === "recovery";
     saveSession({ access_token: hash.get("access_token"), refresh_token: hash.get("refresh_token"), token_type: hash.get("token_type") || "bearer", expires_in: Number(hash.get("expires_in") || 3600), expires_at: Number(hash.get("expires_at") || 0) });
     history.replaceState(null, "", location.pathname + location.search);
+    if (isRecovery) { authShell("reset"); return; }
   }
   if (!state.session?.access_token) { authShell("login"); return; }
   state.user = state.session.user || null;
