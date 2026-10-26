@@ -244,3 +244,13 @@ body{background:var(--canvas)}
  .approved-quote-card{align-items:stretch;flex-direction:column}
  .approved-quote-card .btn{width:100%;justify-content:center}
 }
+
+.account-access-panel{margin-bottom:16px}
+.account-access-panel>.panel-heading{align-items:center}
+.account-access-panel .table-wrap{max-height:360px}
+.account-access-panel tbody td{vertical-align:middle}
+.form-hint{margin:0;color:#87958b;font-size:10px;line-height:1.6;font-weight:400}
+@media(max-width:850px){
+ .heading-actions{flex-wrap:wrap}
+ .heading-actions .btn{flex:1}
+}
