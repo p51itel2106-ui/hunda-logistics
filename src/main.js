@@ -4,7 +4,7 @@ const DB_URL = String(cfg.supabaseUrl || "").replace(/\/$/, "");
 const PUBLIC_KEY = cfg.publishableKey || "";
 const BUCKET = "hunda-documents";
 const SESSION_KEY = "hunda-auth-session";
-const state = { page: "dashboard", workspace: "admin", isAdmin: false, customerAccount: null, customerAccounts: [], managedAccounts: [], session: readSession(), user: null, customers: [], orders: [], customerOrders: [], transactions: [], documents: [], quotes: [], quoteDraft: { actual: "0", cbm: "0", convert: false }, activity: [], customerPage: "orders", search: "", month: new Date().toISOString().slice(0, 7), realtime: null };
+const state = { page: "dashboard", workspace: "admin", isAdmin: false, customerAccount: null, customerAccounts: [], managedAccounts: [], wallet: null, walletAdmin: null, session: readSession(), user: null, customers: [], orders: [], customerOrders: [], transactions: [], documents: [], quotes: [], quoteDraft: { actual: "0", cbm: "0", convert: false }, activity: [], customerPage: "orders", search: "", month: new Date().toISOString().slice(0, 7), realtime: null };
 
 const icons = {
   grid: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
@@ -45,6 +45,8 @@ function readSession() { try { return JSON.parse(localStorage.getItem(SESSION_KE
 function saveSession(session) { state.session = session; session ? localStorage.setItem(SESSION_KEY, JSON.stringify(session)) : localStorage.removeItem(SESSION_KEY); }
 function headers(extra = {}) { return { apikey: PUBLIC_KEY, Authorization: `Bearer ${state.session?.access_token || PUBLIC_KEY}`, ...extra }; }
 async function accountAdminRequest(payload) { return request("/functions/v1/hunda-admin-accounts", { method: "POST", body: JSON.stringify(payload) }); }
+async function walletRequest(payload) { return request("/functions/v1/hunda-wallet", { method: "POST", body: JSON.stringify(payload) }); }
+async function loadWalletSnapshot() { state.wallet = await walletRequest({ action: "snapshot" }); return state.wallet; }
 async function request(path, options = {}, auth = true) {
   const isBinary = typeof Blob !== "undefined" && options.body instanceof Blob;
   const response = await fetch(`${DB_URL}${path}`, { ...options, headers: { apikey: PUBLIC_KEY, Authorization: `Bearer ${auth ? state.session?.access_token || PUBLIC_KEY : PUBLIC_KEY}`, ...(options.body && !(options.body instanceof FormData) && !isBinary ? { "Content-Type": "application/json" } : {}), ...options.headers } });
@@ -174,18 +176,12 @@ async function loadCustomerData() {
   const [orders, documents, quotes] = await Promise.all([
     api("rpc/get_customer_orders", { method: "POST", body: "{}" }),
     api("order_documents?select=*&order=created_at.desc"),
-    api("customer_quotes?select=*&order=created_at.desc"),
-    accountAdminRequest({ action: "list" })
+    api("customer_quotes?select=*&order=created_at.desc")
   ]);
-  state.customerOrders = orders || []; state.orders = state.customerOrders; state.documents = documents || []; state.quotes = quotes || []; state.managedAccounts = managedAccounts?.accounts || []; state.managedAccounts = managedAccounts?.accounts || [];
-}
-async function switchToCustomerWorkspace() {
-  try {
-    await api("rpc/ensure_customer_workspace", { method: "POST", body: "{}" });
-    const profile = await api(`customer_accounts?select=*&user_id=eq.${encodeURIComponent(state.user.id)}`);
-    if (!profile?.length) throw new Error("Không tìm thấy hồ sơ khách hàng của tài khoản này.");
-    state.customerAccount = profile[0]; state.workspace = "customer"; await loadCustomerData(); render();
-  } catch (error) { fail(error); }
+  state.customerOrders = orders || [];
+  state.orders = state.customerOrders;
+  state.documents = documents || [];
+  state.quotes = quotes || [];
 }
 async function switchToAdminWorkspace() {
   state.workspace = "admin";
@@ -516,7 +512,7 @@ async function confirmDelete(label, id, table) {
 
 async function loadData() {
   if (!state.session) return;
-  const [customers, orders, transactions, documents, activity, customerAccounts, quotes, managedAccounts] = await Promise.all([
+  const [customers, orders, transactions, documents, activity, customerAccounts, quotes, managedAccounts, walletAdmin] = await Promise.all([
     api("customers?select=*&order=created_at.desc"),
     api("orders?select=*,customer:customers(name)&order=created_at.desc"),
     api("transactions?select=*,customer:customers(name),order:orders(code)&order=transaction_date.desc,created_at.desc"),
@@ -524,9 +520,18 @@ async function loadData() {
     api("activity_log?select=*&order=occurred_at.desc&limit=200"),
     api("customer_accounts?select=user_id,customer_id,full_name&order=created_at.desc"),
     api("customer_quotes?select=*&order=created_at.desc"),
-    accountAdminRequest({ action: "list" })
+    accountAdminRequest({ action: "list" }),
+    walletRequest({ action: "admin-list" })
   ]);
-  state.customers = customers || []; state.orders = orders || []; state.transactions = transactions || []; state.documents = documents || []; state.activity = activity || []; state.customerAccounts = customerAccounts || []; state.quotes = quotes || [];
+  state.customers = customers || [];
+  state.orders = orders || [];
+  state.transactions = transactions || [];
+  state.documents = documents || [];
+  state.activity = activity || [];
+  state.customerAccounts = customerAccounts || [];
+  state.quotes = quotes || [];
+  state.managedAccounts = managedAccounts?.accounts || [];
+  state.walletAdmin = walletAdmin || { requests: [], bank: null };
 }
 function startRealtime() {
   if (state.realtime || !window.supabase?.createClient || !state.session?.access_token) return;
@@ -568,7 +573,7 @@ async function updatePassword(password) {
 async function signOut() {
   if (state.realtime) { try { await state.realtime.unsubscribe(); } catch {} state.realtime = null; }
   try { if (state.session?.access_token) await request("/auth/v1/logout", { method: "POST" }); } catch { /* Local sign-out still completes when the server session expired. */ }
-  saveSession(null); state.user = null; state.workspace = "admin"; state.isAdmin = false; state.customerAccount = null; state.customerAccounts = []; state.customers = []; state.orders = []; state.customerOrders = []; state.transactions = []; state.documents = []; state.activity = []; authShell("login");
+  saveSession(null); state.user = null; state.workspace = "admin"; state.isAdmin = false; state.customerAccount = null; state.customerAccounts = []; state.customers = []; state.orders = []; state.customerOrders = []; state.transactions = []; state.documents = []; state.activity = []; state.wallet = null; state.walletAdmin = null; state.managedAccounts = []; authShell("login");
 }
 async function enterApp() {
   root.innerHTML = `<main class="loading-screen"><span class="loader"></span><p>Đang đồng bộ Hunda Logistics...</p></main>`;
@@ -577,7 +582,7 @@ async function enterApp() {
     if (state.isAdmin) { state.workspace = "admin"; await loadData(); render(); startRealtime(); return; }
     const profile = await api(`customer_accounts?select=*&user_id=eq.${encodeURIComponent(state.user.id)}`);
     if (!profile?.length) return renderPending(state.user?.email);
-    state.customerAccount = profile[0]; state.workspace = "customer"; await loadCustomerData(); render(); startRealtime();
+    state.customerAccount = profile[0]; state.workspace = "customer"; await loadCustomerData(); await loadWalletSnapshot(); render(); startRealtime();
   } catch (error) { fail(error); authShell("login", `Không tải được dữ liệu: ${error.message}`); }
 }
 function bindAuth() {
