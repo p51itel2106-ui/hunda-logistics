@@ -303,7 +303,7 @@ function quotesView() {
     const cny = quoteCurrencyCny(q.status === "approved" ? q.final_price_cny : q.estimated_price_cny);
     const vnd = q.convert_to_vnd ? '<small class="subline">' + money(q.status === "approved" ? q.final_price_vnd : q.estimated_price_vnd) + '</small>' : "";
     const status = q.status === "approved" ? '<span class="quote-status approved">Đã chốt giá</span>' : '<span class="quote-status pending">Chờ duyệt</span>';
-    const action = q.status === "pending" ? '<button class="btn primary small" data-action="approve-quote" data-id="' + q.id + '">Chốt giá</button>' : '<span class="quote-finalized">Đã gửi khách</span>';
+    const action = q.status === "pending" ? '<button class="btn primary small" data-action="approve-quote" data-id="' + q.id + '">Chốt giá</button>' : '<button class="btn ghost small" data-action="approve-quote" data-id="' + q.id + '">Sửa giá</button>';
     return '<tr><td><b>' + dateText(q.created_at) + '</b><small class="subline">#' + escapeHTML(String(q.id).slice(0, 8).toUpperCase()) + '</small></td><td><b>' + escapeHTML(nameFor(q.user_id)) + '</b></td><td>' + Number(q.actual_weight_kg).toLocaleString("vi-VN") + ' kg<small class="subline">' + Number(q.volume_cbm).toLocaleString("vi-VN") + ' CBM</small></td><td>' + Number(q.chargeable_weight_kg).toLocaleString("vi-VN") + ' kg</td><td><b>' + cny + '</b>' + vnd + '</td><td>' + status + '</td><td>' + action + '</td></tr>';
   }).join("");
   return '<div class="stats-grid"><article class="stat-card"><div class="stat-top"><span>Chờ duyệt</span><i class="stat-icon amber">' + icon("clock", 17) + '</i></div><strong>' + pending + '</strong><small>Yêu cầu báo giá mới</small></article><article class="stat-card"><div class="stat-top"><span>Tổng yêu cầu</span><i class="stat-icon blue">' + icon("file", 17) + '</i></div><strong>' + (state.quotes || []).length + '</strong><small>Đồng bộ từ không gian khách hàng</small></article></div>' +
@@ -312,14 +312,18 @@ function quotesView() {
 }
 function quoteApprovalModal(id) {
   const quote = (state.quotes || []).find(item => item.id === id);
-  if (!quote || quote.status !== "pending") return;
+  if (!quote) return;
+  const isApproved = quote.status === "approved";
   const customer = state.customerAccounts.find(item => item.user_id === quote.user_id)?.full_name || "Khách hàng";
+  const finalPrice = isApproved ? quote.final_price_cny : quote.estimated_price_cny;
+  const finalVnd = isApproved ? quote.final_price_vnd : quote.estimated_price_vnd;
   const fields = field("Khách hàng", "<p>" + escapeHTML(customer) + "</p>") +
     field("Trọng lượng tính giá", "<p>" + Number(quote.chargeable_weight_kg).toLocaleString("vi-VN") + " kg</p>") +
-    textInput("final_price_cny", "Giá chốt (CNY) *", quote.estimated_price_cny, "Nhập giá chốt", "number", true) +
-    textareaInput("admin_note", "Ghi chú gửi khách", "", "Thời hạn báo giá, điều kiện áp dụng...") +
-    field("Quy đổi", "<p>" + (quote.convert_to_vnd ? money(Number(quote.estimated_price_vnd)) + " (tham khảo theo 3.950 VND/CNY)" : "Khách đang xem giá bằng CNY") + "</p>");
-  openModal("Phê duyệt và chốt báo giá", formShell("quote-approval", quote.id, fields), "Duyệt và gửi giá");
+    textInput("final_price_cny", "Giá chốt (CNY) *", finalPrice, "Nhập giá chốt", "number", true) +
+    textareaInput("admin_note", "Ghi chú gửi khách", quote.admin_note || "", "Thời hạn báo giá, điều kiện áp dụng...") +
+    field("Quy đổi", "<p>" + (quote.convert_to_vnd ? money(Number(finalVnd)) + " (tham khảo theo 3.950 VND/CNY)" : "Khách đang xem giá bằng CNY") + "</p>") +
+    (isApproved ? field("Cập nhật", "<p>Khách hàng sẽ thấy giá mới ngay sau khi lưu.</p>") : "");
+  openModal(isApproved ? "Điều chỉnh giá đã chốt" : "Phê duyệt và chốt báo giá", formShell("quote-approval", quote.id, fields), isApproved ? "Lưu giá mới" : "Duyệt và gửi giá");
 }
 
 function activityView() {
