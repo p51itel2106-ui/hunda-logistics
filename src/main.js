@@ -4,7 +4,7 @@ const DB_URL = String(cfg.supabaseUrl || "").replace(/\/$/, "");
 const PUBLIC_KEY = cfg.publishableKey || "";
 const BUCKET = "hunda-documents";
 const SESSION_KEY = "hunda-auth-session";
-const state = { page: "dashboard", workspace: "admin", isAdmin: false, customerAccount: null, customerAccounts: [], session: readSession(), user: null, customers: [], orders: [], customerOrders: [], transactions: [], documents: [], quotes: [], quoteDraft: { actual: "0", cbm: "0", convert: false }, activity: [], customerPage: "orders", search: "", month: new Date().toISOString().slice(0, 7), realtime: null };
+const state = { page: "dashboard", workspace: "admin", isAdmin: false, customerAccount: null, customerAccounts: [], managedAccounts: [], session: readSession(), user: null, customers: [], orders: [], customerOrders: [], transactions: [], documents: [], quotes: [], quoteDraft: { actual: "0", cbm: "0", convert: false }, activity: [], customerPage: "orders", search: "", month: new Date().toISOString().slice(0, 7), realtime: null };
 
 const icons = {
   grid: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
@@ -44,6 +44,7 @@ const monthLabel = value => new Intl.DateTimeFormat("vi-VN", { month: "long", ye
 function readSession() { try { return JSON.parse(localStorage.getItem(SESSION_KEY) || "null"); } catch { return null; } }
 function saveSession(session) { state.session = session; session ? localStorage.setItem(SESSION_KEY, JSON.stringify(session)) : localStorage.removeItem(SESSION_KEY); }
 function headers(extra = {}) { return { apikey: PUBLIC_KEY, Authorization: `Bearer ${state.session?.access_token || PUBLIC_KEY}`, ...extra }; }
+async function accountAdminRequest(payload) { return request("/functions/v1/hunda-admin-accounts", { method: "POST", body: JSON.stringify(payload) }); }
 async function request(path, options = {}, auth = true) {
   const isBinary = typeof Blob !== "undefined" && options.body instanceof Blob;
   const response = await fetch(`${DB_URL}${path}`, { ...options, headers: { apikey: PUBLIC_KEY, Authorization: `Bearer ${auth ? state.session?.access_token || PUBLIC_KEY : PUBLIC_KEY}`, ...(options.body && !(options.body instanceof FormData) && !isBinary ? { "Content-Type": "application/json" } : {}), ...options.headers } });
@@ -112,7 +113,7 @@ function shell(content) {
 }
 function pageAction() {
   if (state.page === "orders") return `<button class="btn primary" data-action="new-order">${icon("plus", 17)} Tạo đơn hàng</button>`;
-  if (state.page === "customers") return `<button class="btn primary" data-action="new-customer">${icon("plus", 17)} Thêm khách hàng</button>`;
+  if (state.page === "customers") return `<button class="btn ghost" data-action="new-customer">${icon("plus", 16)} Thêm khách hàng</button><button class="btn primary" data-action="new-account">${icon("users", 16)} Cấp tài khoản</button>`;
   if (state.page === "transactions") return `<button class="btn primary" data-action="new-transaction">${icon("plus", 17)} Ghi nhận thu chi</button>`;
   if (state.page === "documents") return `<button class="btn primary" data-action="new-document">${icon("upload", 17)} Tải chứng từ</button>`;
   if (state.page === "quotes") return '<button class="btn ghost" data-action="refresh">' + icon("refresh", 16) + ' Làm mới yêu cầu</button>';
@@ -173,9 +174,10 @@ async function loadCustomerData() {
   const [orders, documents, quotes] = await Promise.all([
     api("rpc/get_customer_orders", { method: "POST", body: "{}" }),
     api("order_documents?select=*&order=created_at.desc"),
-    api("customer_quotes?select=*&order=created_at.desc")
+    api("customer_quotes?select=*&order=created_at.desc"),
+    accountAdminRequest({ action: "list" })
   ]);
-  state.customerOrders = orders || []; state.orders = state.customerOrders; state.documents = documents || []; state.quotes = quotes || [];
+  state.customerOrders = orders || []; state.orders = state.customerOrders; state.documents = documents || []; state.quotes = quotes || []; state.managedAccounts = managedAccounts?.accounts || [];
 }
 async function switchToCustomerWorkspace() {
   try {
@@ -385,6 +387,7 @@ function action(actionName, id) {
   if (actionName === "edit-order") return orderModal(state.orders.find(o => o.id === id));
   if (actionName === "delete-order") return confirmDelete("đơn hàng", id, "orders");
   if (actionName === "new-customer") return customerModal();
+  if (actionName === "new-account") return managedAccountModal();
   if (actionName === "edit-customer") return customerModal(state.customers.find(c => c.id === id));
   if (actionName === "delete-customer") return confirmDelete("khách hàng", id, "customers");
   if (actionName === "new-transaction") return transactionModal();
@@ -425,7 +428,10 @@ function documentModal(document, orderId = "") {
 async function handleRecordSubmit(e) {
   e.preventDefault(); const form = e.currentTarget; const data = new FormData(form); const kind = form.dataset.kind; const id = form.dataset.id; const button = document.querySelector(".modal-foot [type=submit]"); button.disabled = true; button.innerHTML = '<span class="spinner"></span> Đang lưu';
   try {
-    if (kind === "document") await uploadDocument(data);
+    if (kind === "managed-account") {
+      const result = await accountAdminRequest({ action: "create", account: { role: String(data.get("role")), full_name: String(data.get("full_name") || "").trim(), email: String(data.get("email") || "").trim(), phone: String(data.get("phone") || "").trim(), company: String(data.get("company") || "").trim(), password: String(data.get("password") || "") } });
+      if (!result?.account?.user_id) throw new Error("Máy chủ chưa xác nhận tài khoản mới.");
+    } else if (kind === "document") await uploadDocument(data);
     else if (kind === "customer-order") {
       await api("rpc/submit_customer_order", { method: "POST", body: JSON.stringify({ p_quote_id: String(data.get("quote_id") || ""), p_route: String(data.get("route") || "").trim(), p_cargo_description: String(data.get("cargo_description") || "").trim() || null, p_note: String(data.get("note") || "").trim() || null }) });
     } else if (kind === "quote-approval") {
@@ -445,7 +451,7 @@ async function handleRecordSubmit(e) {
       if (id) await api(`${kind === "order" ? "orders" : kind === "customer" ? "customers" : "transactions"}?id=eq.${id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify(record) });
       else await api(kind === "order" ? "orders" : kind === "customer" ? "customers" : "transactions", { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify(record) });
     }
-    closeModal(); if (state.workspace === "customer") await loadCustomerData(); else await loadData(); render(); showToast("Đã lưu và đồng bộ dữ liệu.");
+    closeModal(); if (state.workspace === "customer") await loadCustomerData(); else await loadData(); render(); showToast(kind === "managed-account" ? "Đã cấp tài khoản và đồng bộ hồ sơ lên máy chủ." : "Đã lưu và đồng bộ dữ liệu.");
   } catch (error) { fail(error); button.disabled = false; button.innerHTML = "Thử lại"; }
 }
 async function uploadDocument(form) {
@@ -474,7 +480,7 @@ async function confirmDelete(label, id, table) {
 
 async function loadData() {
   if (!state.session) return;
-  const [customers, orders, transactions, documents, activity, customerAccounts, quotes] = await Promise.all([
+  const [customers, orders, transactions, documents, activity, customerAccounts, quotes, managedAccounts] = await Promise.all([
     api("customers?select=*&order=created_at.desc"),
     api("orders?select=*,customer:customers(name)&order=created_at.desc"),
     api("transactions?select=*,customer:customers(name),order:orders(code)&order=transaction_date.desc,created_at.desc"),
