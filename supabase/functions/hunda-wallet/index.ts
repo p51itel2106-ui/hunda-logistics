@@ -92,7 +92,7 @@ Deno.serve(async (req: Request) => {
           fullacc: "true",
           holder: bank.bank_holder,
         });
-        return json({ transaction_id: transactionId, transfer_code: transaction.transfer_code, qr_url: "https://vietqr.app/img?" + params.toString(), bank }, 201);
+        return json({ transaction_id: transactionId, amount, transfer_code: transaction.transfer_code, qr_url: "https://vietqr.app/img?" + params.toString(), bank }, 201);
       }
       return json({ transaction_id: transactionId }, 201);
     }
