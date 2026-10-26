@@ -148,7 +148,7 @@ function customerWorkspaceView() {
   const statusText = { new: "Đã tiếp nhận", in_progress: "Đang vận chuyển", completed: "Hoàn tất", cancelled: "Đã hủy" };
   const orderRows = orders.length ? orders.map(order => {
     const docs = state.documents.filter(d => d.order_id === order.id);
-    return `<tr><td><b class="order-code">${escapeHTML(order.code)}</b><small class="subline">${dateText(order.created_at)}</small></td><td><b>${escapeHTML(order.route || "—")}</b><small class="subline">${escapeHTML(order.cargo_description || "Chưa có mô tả hàng")}</small></td><td><span class="pill ${escapeHTML(order.status)}"><i></i>${statusText[order.status] || escapeHTML(order.status)}</span></td><td>${docs.length} tệp</td><td><div class="row-actions"><button class="btn ghost small" data-action="order-document" data-id="${order.id}">${icon("upload", 14)} Chứng từ</button></div></td></tr>`;
+    return `<tr><td><b class="order-code">${escapeHTML(order.code)}</b><small class="subline">${dateText(order.created_at)}</small></td><td><b>${escapeHTML(order.route || "—")}</b><small class="subline">${escapeHTML(order.cargo_description || "Chưa có mô tả hàng")}</small>${order.quote_id ? '<small class="subline">Báo giá #' + escapeHTML(String(order.quote_id).slice(0, 8).toUpperCase()) + (order.quote_final_price_cny ? " · " + quoteCurrencyCny(order.quote_final_price_cny) : "") + '</small>' : ""}</td><td><span class="pill ${escapeHTML(order.status)}"><i></i>${statusText[order.status] || escapeHTML(order.status)}</span></td><td>${docs.length} tệp</td><td><div class="row-actions"><button class="btn ghost small" data-action="order-document" data-id="${order.id}">${icon("upload", 14)} Chứng từ</button></div></td></tr>`;
   }).join("") : `<tr><td colspan="5"><div class="empty-state customer-empty"><span class="empty-icon">${icon("box", 24)}</span><b>Chưa có yêu cầu đơn hàng</b><p>Gửi thông tin tuyến vận chuyển để Hunda tiếp nhận và phản hồi trạng thái.</p><button class="btn primary small" data-action="new-customer-order">${icon("plus", 15)} Tạo yêu cầu</button></div></td></tr>`;
   const documents = state.documents.length ? state.documents.map(doc => {
     const order = orders.find(o => o.id === doc.order_id);
@@ -205,7 +205,7 @@ function ordersView() {
 }
 function orderTable(rows, actions) {
   if (!rows.length) return emptyState("box", "Chưa có đơn hàng", "Tạo đơn hàng đầu tiên để bắt đầu quản lý vận hành.", "new-order");
-  return `<div class="table-wrap"><table><thead><tr><th>MÃ ĐƠN</th><th>KHÁCH HÀNG</th><th>TUYẾN / HÀNG HÓA</th><th>GIÁ TRỊ</th><th>TRẠNG THÁI</th><th>NGÀY TẠO</th>${actions ? "<th></th>" : ""}</tr></thead><tbody>${rows.map(o => `<tr><td><b class="order-code">${escapeHTML(o.code)}</b></td><td><span class="customer-cell">${avatar(o.customer?.name)}<span>${escapeHTML(o.customer?.name || "Khách lẻ")}</span></span></td><td><b>${escapeHTML(o.route || "—")}</b><small class="subline">${escapeHTML(o.cargo_description || "Chưa có mô tả hàng")}</small></td><td><b>${money(o.amount)}</b></td><td>${statusPill(o.status, "order")}</td><td>${dateText(o.created_at)}</td>${actions ? `<td><div class="row-actions"><button class="icon-button" title="Chứng từ" data-action="order-document" data-id="${o.id}">${icon("upload", 16)}</button><button class="icon-button" title="Sửa" data-action="edit-order" data-id="${o.id}">${icon("edit", 16)}</button><button class="icon-button danger" title="Xóa" data-action="delete-order" data-id="${o.id}">${icon("trash", 16)}</button></div></td>` : ""}</tr>`).join("")}</tbody></table></div>`;
+  return `<div class="table-wrap"><table><thead><tr><th>MÃ ĐƠN</th><th>KHÁCH HÀNG</th><th>TUYẾN / HÀNG HÓA</th><th>GIÁ TRỊ</th><th>TRẠNG THÁI</th><th>NGÀY TẠO</th>${actions ? "<th></th>" : ""}</tr></thead><tbody>${rows.map(o => `<tr><td><b class="order-code">${escapeHTML(o.code)}</b></td><td><span class="customer-cell">${avatar(o.customer?.name)}<span>${escapeHTML(o.customer?.name || "Khách lẻ")}</span></span></td><td><b>${escapeHTML(o.route || "—")}</b><small class="subline">${escapeHTML(o.cargo_description || "Chưa có mô tả hàng")}</small>${o.quote_id ? '<small class="subline">Báo giá #' + escapeHTML(String(o.quote_id).slice(0, 8).toUpperCase()) + (state.quotes.find(q => q.id === o.quote_id)?.final_price_cny ? " · " + quoteCurrencyCny(state.quotes.find(q => q.id === o.quote_id).final_price_cny) : "") + '</small>' : ""}</td><td><b>${money(o.amount)}</b></td><td>${statusPill(o.status, "order")}</td><td>${dateText(o.created_at)}</td>${actions ? `<td><div class="row-actions"><button class="icon-button" title="Chứng từ" data-action="order-document" data-id="${o.id}">${icon("upload", 16)}</button><button class="icon-button" title="Sửa" data-action="edit-order" data-id="${o.id}">${icon("edit", 16)}</button><button class="icon-button danger" title="Xóa" data-action="delete-order" data-id="${o.id}">${icon("trash", 16)}</button></div></td>` : ""}</tr>`).join("")}</tbody></table></div>`;
 }
 function customersView() {
   const rows = state.customers.filter(c => [c.name, c.email, c.phone, c.company].join(" ").toLowerCase().includes(state.search));
@@ -326,7 +326,7 @@ function activityView() {
   const rows = state.activity || [];
   const actionLabel = { INSERT: "Tạo mới", UPDATE: "Cập nhật", DELETE: "Xóa" };
   const entityLabel = { customers: "Khách hàng", orders: "Đơn hàng", transactions: "Thu chi", order_documents: "Chứng từ", "chứng từ · tệp lưu trữ": "Tệp chứng từ" };
-  const fieldLabel = { name: "Tên", company: "Công ty", phone: "Điện thoại", email: "Email", route: "Tuyến", cargo_description: "Hàng hóa", amount: "Giá trị", expected_cost: "Chi phí dự kiến", status: "Trạng thái", note: "Ghi chú", direction: "Loại thu/chi", category: "Danh mục", transaction_date: "Ngày giao dịch", method: "Phương thức", customer_id: "Khách hàng", order_id: "Đơn hàng", reference: "Mã tham chiếu", file_name: "Tên tệp", storage_path: "Đường dẫn tệp", file_size: "Dung lượng" };
+  const fieldLabel = { name: "Tên", company: "Công ty", phone: "Điện thoại", email: "Email", route: "Tuyến", cargo_description: "Hàng hóa", amount: "Giá trị", expected_cost: "Chi phí dự kiến", status: "Trạng thái", note: "Ghi chú", direction: "Loại thu/chi", category: "Danh mục", transaction_date: "Ngày giao dịch", method: "Phương thức", customer_id: "Khách hàng", order_id: "Đơn hàng", quote_id: "Báo giá liên quan", reference: "Mã tham chiếu", file_name: "Tên tệp", storage_path: "Đường dẫn tệp", file_size: "Dung lượng" };
   const deviceLabel = ua => {
     if (!ua) return "Không rõ thiết bị";
     const os = /Windows/i.test(ua) ? "Windows" : /Android/i.test(ua) ? "Android" : /iPhone|iPad/i.test(ua) ? "iOS" : /Mac OS/i.test(ua) ? "macOS" : /Linux/i.test(ua) ? "Linux" : "Thiết bị khác";
@@ -389,7 +389,12 @@ function orderModal(order) {
   openModal(order ? "Cập nhật đơn hàng" : "Tạo đơn hàng mới", formShell("order", order?.id, fields), order ? "Lưu thay đổi" : "Tạo đơn hàng");
 }
 function customerOrderModal() {
-  const fields = `${textInput("route", "Tuyến vận chuyển", "", "VD: TP. Hồ Chí Minh → Hà Nội", "text", true)}${textInput("cargo_description", "Mô tả hàng hóa", "", "Tên hàng, số kiện, khối lượng...")}${textareaInput("note", "Yêu cầu xử lý", "", "Thời gian, lưu ý nhận hàng hoặc yêu cầu khác")}`;
+  const approvedQuotes = (state.quotes || []).filter(quote => quote.user_id === state.user?.id && quote.status === "approved");
+  const quoteOptions = approvedQuotes.length
+    ? approvedQuotes.map((quote, index) => `<option value="${escapeHTML(quote.id)}" ${index === 0 ? "selected" : ""}>${dateText(quote.approved_at)} · ${quoteCurrencyCny(quote.final_price_cny)} · ${Number(quote.chargeable_weight_kg).toLocaleString("vi-VN")} kg</option>`).join("")
+    : '<option value="" selected disabled>Chưa có báo giá được duyệt</option>';
+  const quoteNotice = approvedQuotes.length ? "" : field("Lưu ý", '<p class="quote-order-note">Bạn cần gửi yêu cầu báo giá và chờ quản trị viên chốt giá trước khi tạo đơn hàng.</p>', true);
+  const fields = `${selectInput("quote_id", "Báo giá đã được duyệt", quoteOptions, "", true)}${quoteNotice}${textInput("route", "Tuyến vận chuyển", "", "VD: TP. Hồ Chí Minh → Hà Nội", "text", true)}${textInput("cargo_description", "Mô tả hàng hóa", "", "Tên hàng, số kiện, khối lượng...")}${textareaInput("note", "Yêu cầu xử lý", "", "Thời gian, lưu ý nhận hàng hoặc yêu cầu khác")}`;
   openModal("Gửi yêu cầu đơn hàng", formShell("customer-order", "", fields), "Gửi yêu cầu");
 }
 function customerModal(customer) {
@@ -409,7 +414,7 @@ async function handleRecordSubmit(e) {
   try {
     if (kind === "document") await uploadDocument(data);
     else if (kind === "customer-order") {
-      await api("rpc/submit_customer_order", { method: "POST", body: JSON.stringify({ p_route: String(data.get("route") || "").trim(), p_cargo_description: String(data.get("cargo_description") || "").trim() || null, p_note: String(data.get("note") || "").trim() || null }) });
+      await api("rpc/submit_customer_order", { method: "POST", body: JSON.stringify({ p_quote_id: String(data.get("quote_id") || ""), p_route: String(data.get("route") || "").trim(), p_cargo_description: String(data.get("cargo_description") || "").trim() || null, p_note: String(data.get("note") || "").trim() || null }) });
     } else if (kind === "quote-approval") {
       const finalPrice = Number(data.get("final_price_cny"));
       if (!Number.isFinite(finalPrice) || finalPrice <= 0) throw new Error("Giá chốt phải lớn hơn 0.");
