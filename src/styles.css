@@ -261,3 +261,31 @@ body{background:var(--canvas)}
 .report-card.emphasis b.negative{color:#bd6658}
 @media(max-width:900px){.report-summary{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:560px){.report-summary{grid-template-columns:1fr}}
+
+.account-access-panel{margin-bottom:16px}
+.account-access-panel>.panel-heading{align-items:center}
+.account-access-panel .table-wrap{max-height:360px}
+.account-access-panel tbody td{vertical-align:middle}
+.wallet-requests-panel{margin-bottom:16px}
+.wallet-balance{font:700 12px Manrope,sans-serif;color:#236d49;white-space:nowrap}
+.wallet-overview{display:flex;align-items:center;justify-content:space-between;gap:20px;margin:0 0 16px;padding:20px 22px;background:linear-gradient(110deg,#eaf5ed,#f5f9f5);border-color:#dfece2}
+.wallet-overview h2{font:700 12px Manrope,sans-serif;color:#506456;margin:7px 0 2px}
+.wallet-overview strong{font:800 26px Manrope,sans-serif;letter-spacing:-.5px;color:#176b4b}
+.wallet-overview p{margin:5px 0 0;color:#7e8d82;font-size:10px}
+.wallet-actions{display:flex;gap:9px;flex:none}
+.wallet-bank-info{display:grid;gap:7px;padding:13px 14px;background:#f4f8f5;border:1px solid #e1ebe3;border-radius:7px;color:#687a6e;font-size:10px;line-height:1.5}
+.wallet-bank-info>b,.wallet-bank-info>strong{color:#294936}
+.wallet-bank-info>strong{font:700 17px Manrope,sans-serif;letter-spacing:.5px}
+.wallet-bank-info.pending{background:#fff8ec;border-color:#f2e3c7;color:#8c6c33}
+.wallet-available{font:700 14px Manrope,sans-serif;color:#176b4b;margin:0}
+.form-hint{margin:0;color:#87958b;font-size:10px;line-height:1.6;font-weight:400}
+@media(max-width:850px){
+ .heading-actions{flex-wrap:wrap}
+ .heading-actions .btn{flex:1}
+}
+@media(max-width:600px){
+ .wallet-overview{align-items:flex-start;flex-direction:column;padding:16px}
+ .wallet-actions{width:100%}
+ .wallet-actions .btn{flex:1}
+ .account-access-panel>.panel-heading{align-items:flex-start;flex-direction:column}
+}
