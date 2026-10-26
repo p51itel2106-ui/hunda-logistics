@@ -4,7 +4,7 @@ const DB_URL = String(cfg.supabaseUrl || "").replace(/\/$/, "");
 const PUBLIC_KEY = cfg.publishableKey || "";
 const BUCKET = "hunda-documents";
 const SESSION_KEY = "hunda-auth-session";
-const state = { page: "dashboard", workspace: "admin", isAdmin: false, customerAccount: null, customerAccounts: [], session: readSession(), user: null, customers: [], orders: [], customerOrders: [], transactions: [], documents: [], activity: [], search: "", month: new Date().toISOString().slice(0, 7), realtime: null };
+const state = { page: "dashboard", workspace: "admin", isAdmin: false, customerAccount: null, customerAccounts: [], session: readSession(), user: null, customers: [], orders: [], customerOrders: [], transactions: [], documents: [], quotes: [], activity: [], customerPage: "orders", search: "", month: new Date().toISOString().slice(0, 7), realtime: null };
 
 const icons = {
   grid: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
@@ -101,9 +101,9 @@ function renderPending(email) {
 }
 
 const pages = [
-  ["dashboard", "Tổng quan", "grid"], ["orders", "Đơn hàng", "box"], ["customers", "Khách hàng", "users"], ["transactions", "Thu chi", "wallet"], ["reports", "Báo cáo tài chính", "chart"], ["documents", "Chứng từ", "file"], ["activity", "Nhật ký thao tác", "clock"]
+  ["dashboard", "Tổng quan", "grid"], ["orders", "Đơn hàng", "box"], ["customers", "Khách hàng", "users"], ["transactions", "Thu chi", "wallet"], ["reports", "Báo cáo tài chính", "chart"], ["documents", "Chứng từ", "file"], ["quotes", "Báo giá", "file"], ["activity", "Nhật ký thao tác", "clock"]
 ];
-const pageTitles = { dashboard: ["Tổng quan", "Theo dõi hoạt động và dòng tiền của Hunda Logistics."], orders: ["Đơn hàng", "Quản lý vận chuyển từ lúc tiếp nhận đến khi hoàn tất."], customers: ["Khách hàng", "Lưu thông tin và theo dõi lịch sử hợp tác."], transactions: ["Thu chi", "Ghi nhận các khoản thu, chi và trạng thái thanh toán."], reports: ["Báo cáo tài chính", "Dòng tiền và kết quả theo các giao dịch đã xác nhận."], documents: ["Chứng từ", "Tệp đính kèm được lưu trong kho riêng tư trên máy chủ."], activity: ["Nhật ký thao tác", "Theo dõi thay đổi đơn hàng, khách hàng, thu chi và chứng từ."] };
+const pageTitles = { dashboard: ["Tổng quan", "Theo dõi hoạt động và dòng tiền của Hunda Logistics."], orders: ["Đơn hàng", "Quản lý vận chuyển từ lúc tiếp nhận đến khi hoàn tất."], customers: ["Khách hàng", "Lưu thông tin và theo dõi lịch sử hợp tác."], transactions: ["Thu chi", "Ghi nhận các khoản thu, chi và trạng thái thanh toán."], reports: ["Báo cáo tài chính", "Dòng tiền và kết quả theo các giao dịch đã xác nhận."], documents: ["Chứng từ", "Tệp đính kèm được lưu trong kho riêng tư trên máy chủ."], quotes: ["Báo giá", "Duyệt yêu cầu và chốt giá cuối cùng gửi cho khách hàng."], activity: ["Nhật ký thao tác", "Theo dõi thay đổi đơn hàng, khách hàng, thu chi và chứng từ."] };
 
 function shell(content) {
   const [title, subtitle] = pageTitles[state.page];
@@ -115,6 +115,7 @@ function pageAction() {
   if (state.page === "customers") return `<button class="btn primary" data-action="new-customer">${icon("plus", 17)} Thêm khách hàng</button>`;
   if (state.page === "transactions") return `<button class="btn primary" data-action="new-transaction">${icon("plus", 17)} Ghi nhận thu chi</button>`;
   if (state.page === "documents") return `<button class="btn primary" data-action="new-document">${icon("upload", 17)} Tải chứng từ</button>`;
+  if (state.page === "quotes") return '<button class="btn ghost" data-action="refresh">' + icon("refresh", 16) + ' Làm mới yêu cầu</button>';
   if (state.page === "activity") return `<span class="live-badge ${state.realtimeStatus === "SUBSCRIBED" ? "connected" : ""}"><i></i>${state.realtimeStatus === "SUBSCRIBED" ? "Đang đồng bộ trực tiếp" : "Đang kết nối · làm mới dự phòng"} · UTC+7</span>`;
   if (state.page === "reports") return `<label class="month-control">${icon("calendar", 16)}<input type="month" id="report-month" value="${state.month}" /></label>`;
   return `<button class="btn ghost" data-page="orders">${icon("box", 16)} Xem đơn hàng</button>`;
@@ -138,6 +139,7 @@ function render() {
   if (state.page === "transactions") return shell(transactionsView());
   if (state.page === "reports") return shell(reportsView());
   if (state.page === "activity") return shell(activityView());
+  if (state.page === "quotes") return shell(quotesView());
   return shell(documentsView());
 }
 function customerWorkspaceView() {
@@ -152,19 +154,21 @@ function customerWorkspaceView() {
     const order = orders.find(o => o.id === doc.order_id);
     return `<tr><td><b>${escapeHTML(doc.file_name)}</b><small class="subline">${escapeHTML(doc.note || doc.mime_type || "Chứng từ")}</small></td><td>${escapeHTML(order?.code || "—")}</td><td>${dateText(doc.created_at)}</td><td><div class="row-actions"><button class="icon-button" data-action="download-document" data-id="${doc.id}" title="Tải xuống">${icon("download", 16)}</button><button class="icon-button danger" data-action="delete-document" data-id="${doc.id}" title="Xóa">${icon("trash", 16)}</button></div></td></tr>`;
   }).join("") : `<tr><td colspan="4"><div class="empty-compact">Chứng từ của các đơn hàng sẽ xuất hiện tại đây.</div></td></tr>`;
-  root.innerHTML = `<div class="app-shell customer-app"><aside class="sidebar"><div class="brand"><img class="brand-emblem" src="/assets/hunda-emblem.jpg" alt="" /><div><b>HUNDA <em>BUS</em></b><small>LOGISTICS × E-COMMERCE</small></div></div><div class="workspace"><span class="workspace-dot"></span><span><b>Hunda Logistics</b><small>Không gian khách hàng</small></span>${icon("dots", 16)}</div><div class="nav-label">ĐƠN HÀNG</div><nav><button class="nav-item active" data-customer-page="orders">${icon("box", 18)}<span>Đơn hàng của tôi</span>${active ? `<small>${active}</small>` : ""}</button><button class="nav-item" data-customer-page="documents">${icon("file", 18)}<span>Chứng từ đơn hàng</span></button></nav><div class="sidebar-bottom"><div class="sync-card"><span class="sync-dot"></span><div><b>Đã đồng bộ</b><small>Yêu cầu lên máy chủ</small></div>${icon("refresh", 15)}</div><div class="user-row"><span class="avatar">${escapeHTML((state.customerAccount?.full_name || state.user?.email || "K").slice(0, 1).toUpperCase())}</span><span class="user-info"><b>${escapeHTML(state.customerAccount?.full_name || state.user?.email || "Khách hàng")}</b><small>Khách hàng</small></span><button class="icon-button logout-button" id="logout" title="Đăng xuất">${icon("logout", 17)}</button></div></div></aside><main class="main-area"><header class="topbar"><div class="breadcrumb">Hunda Logistics <span>/</span> <b>Không gian khách hàng</b></div><div class="top-actions">${state.isAdmin ? `<button class="btn ghost small" data-action="switch-admin">${icon("shield", 15)} Trở về quản trị</button>` : ""}<span class="sync-label">${icon("refresh", 15)} Đồng bộ đơn hàng</span><button class="icon-button" id="customer-refresh" title="Làm mới">${icon("refresh", 18)}</button><button class="icon-button" id="logout-customer" title="Đăng xuất">${icon("logout", 17)}</button></div></header><div class="page-content"><div class="page-heading"><div><span class="eyebrow">CỔNG KHÁCH HÀNG</span><h1>Đơn hàng của tôi</h1><p>Tạo yêu cầu vận chuyển và theo dõi các cập nhật từ Hunda Logistics.</p></div><div class="heading-actions"><button class="btn primary" data-action="new-customer-order">${icon("plus", 17)} Tạo yêu cầu đơn hàng</button></div></div><div class="welcome-strip"><div class="welcome-art">${icon("truck", 30)}</div><div><b>Xin chào, ${escapeHTML(state.customerAccount?.full_name || "Quý khách")}</b><span>Thông tin đơn hàng của bạn được đồng bộ với đội ngũ Hunda.</span></div></div><div class="stats-grid customer-stats"><article class="stat-card"><div class="stat-top"><span>Tổng yêu cầu</span><i class="stat-icon blue">${icon("box", 17)}</i></div><strong>${orders.length}</strong><small>Đơn hàng của bạn</small></article><article class="stat-card"><div class="stat-top"><span>Đang xử lý</span><i class="stat-icon amber">${icon("clock", 17)}</i></div><strong>${active}</strong><small>Chờ tiếp nhận hoặc đang vận chuyển</small></article><article class="stat-card"><div class="stat-top"><span>Đã hoàn tất</span><i class="stat-icon green">${icon("check", 17)}</i></div><strong>${orders.filter(o => o.status === "completed").length}</strong><small>Đơn hàng hoàn tất</small></article><article class="stat-card"><div class="stat-top"><span>Chứng từ</span><i class="stat-icon coral">${icon("file", 17)}</i></div><strong>${state.documents.length}</strong><small>Tệp đính kèm trên máy chủ</small></article></div><section class="panel table-panel customer-table-panel"><div class="panel-heading"><div><h2>Tiến trình đơn hàng</h2><p>Trạng thái được cập nhật tự động khi Hunda xử lý.</p></div></div><div class="table-wrap"><table><thead><tr><th>MÃ YÊU CẦU</th><th>TUYẾN / HÀNG HÓA</th><th>TRẠNG THÁI</th><th>CHỨNG TỪ</th><th></th></tr></thead><tbody>${orderRows}</tbody></table></div></section><section class="panel table-panel customer-documents-panel"><div class="panel-heading"><div><h2>Chứng từ đơn hàng</h2><p>Tệp bạn đã gửi được lưu trên máy chủ riêng tư.</p></div></div><div class="table-wrap"><table><thead><tr><th>TÊN TỆP</th><th>ĐƠN HÀNG</th><th>NGÀY TẢI</th><th></th></tr></thead><tbody>${documents}</tbody></table></div></section><p class="customer-footer-note">Thông tin trạng thái sẽ tự làm mới định kỳ và được chuyển đến bộ phận quản trị.</p></div></main></div><div id="modal-root"></div><div id="toast-host" class="toast-host"></div>`;
+  root.innerHTML = `<div class="app-shell customer-app"><aside class="sidebar"><div class="brand"><img class="brand-emblem" src="/assets/hunda-emblem.jpg" alt="" /><div><b>HUNDA <em>BUS</em></b><small>LOGISTICS × E-COMMERCE</small></div></div><div class="workspace"><span class="workspace-dot"></span><span><b>Hunda Logistics</b><small>Không gian khách hàng</small></span>${icon("dots", 16)}</div><div class="nav-label">ĐƠN HÀNG</div><nav><button class="nav-item" data-customer-page="quotes">${icon("file", 18)}<span>Báo giá</span></button><button class="nav-item active" data-customer-page="orders">${icon("box", 18)}<span>Lịch sử đơn hàng</span>${active ? `<small>${active}</small>` : ""}</button><button class="nav-item" data-customer-page="documents">${icon("file", 18)}<span>Chứng từ đơn hàng</span></button></nav><div class="sidebar-bottom"><div class="sync-card"><span class="sync-dot"></span><div><b>Đã đồng bộ</b><small>Yêu cầu lên máy chủ</small></div>${icon("refresh", 15)}</div><div class="user-row"><span class="avatar">${escapeHTML((state.customerAccount?.full_name || state.user?.email || "K").slice(0, 1).toUpperCase())}</span><span class="user-info"><b>${escapeHTML(state.customerAccount?.full_name || state.user?.email || "Khách hàng")}</b><small>Khách hàng</small></span><button class="icon-button logout-button" id="logout" title="Đăng xuất">${icon("logout", 17)}</button></div></div></aside><main class="main-area"><header class="topbar"><div class="breadcrumb">Hunda Logistics <span>/</span> <b>Không gian khách hàng</b></div><div class="top-actions">${state.isAdmin ? `<button class="btn ghost small" data-action="switch-admin">${icon("shield", 15)} Trở về quản trị</button>` : ""}<span class="sync-label">${icon("refresh", 15)} Đồng bộ đơn hàng</span><button class="icon-button" id="customer-refresh" title="Làm mới">${icon("refresh", 18)}</button><button class="icon-button" id="logout-customer" title="Đăng xuất">${icon("logout", 17)}</button></div></header><div class="page-content"><div class="page-heading"><div><span class="eyebrow">CỔNG KHÁCH HÀNG</span><h1>Lịch sử đơn hàng</h1><p>Tạo yêu cầu vận chuyển và theo dõi các cập nhật từ Hunda Logistics.</p></div><div class="heading-actions"><button class="btn primary" data-action="new-customer-order">${icon("plus", 17)} Tạo yêu cầu đơn hàng</button></div></div><div class="welcome-strip"><div class="welcome-art">${icon("truck", 30)}</div><div><b>Xin chào, ${escapeHTML(state.customerAccount?.full_name || "Quý khách")}</b><span>Thông tin đơn hàng của bạn được đồng bộ với đội ngũ Hunda.</span></div></div><div class="stats-grid customer-stats"><article class="stat-card"><div class="stat-top"><span>Tổng yêu cầu</span><i class="stat-icon blue">${icon("box", 17)}</i></div><strong>${orders.length}</strong><small>Đơn hàng của bạn</small></article><article class="stat-card"><div class="stat-top"><span>Đang xử lý</span><i class="stat-icon amber">${icon("clock", 17)}</i></div><strong>${active}</strong><small>Chờ tiếp nhận hoặc đang vận chuyển</small></article><article class="stat-card"><div class="stat-top"><span>Đã hoàn tất</span><i class="stat-icon green">${icon("check", 17)}</i></div><strong>${orders.filter(o => o.status === "completed").length}</strong><small>Đơn hàng hoàn tất</small></article><article class="stat-card"><div class="stat-top"><span>Chứng từ</span><i class="stat-icon coral">${icon("file", 17)}</i></div><strong>${state.documents.length}</strong><small>Tệp đính kèm trên máy chủ</small></article></div>${customerQuotesPanel()}<section class="panel table-panel customer-table-panel"><div class="panel-heading"><div><h2>Tiến trình đơn hàng</h2><p>Trạng thái được cập nhật tự động khi Hunda xử lý.</p></div></div><div class="table-wrap"><table><thead><tr><th>MÃ YÊU CẦU</th><th>TUYẾN / HÀNG HÓA</th><th>TRẠNG THÁI</th><th>CHỨNG TỪ</th><th></th></tr></thead><tbody>${orderRows}</tbody></table></div></section><section class="panel table-panel customer-documents-panel"><div class="panel-heading"><div><h2>Chứng từ đơn hàng</h2><p>Tệp bạn đã gửi được lưu trên máy chủ riêng tư.</p></div></div><div class="table-wrap"><table><thead><tr><th>TÊN TỆP</th><th>ĐƠN HÀNG</th><th>NGÀY TẢI</th><th></th></tr></thead><tbody>${documents}</tbody></table></div></section><p class="customer-footer-note">Thông tin trạng thái sẽ tự làm mới định kỳ và được chuyển đến bộ phận quản trị.</p></div></main></div><div id="modal-root"></div><div id="toast-host" class="toast-host"></div>`;
   document.querySelector("#logout")?.addEventListener("click", signOut);
   document.querySelector("#logout-customer")?.addEventListener("click", signOut);
   document.querySelector("#customer-refresh")?.addEventListener("click", () => loadCustomerData().then(render).catch(fail));
-  document.querySelectorAll("[data-customer-page]").forEach(button => button.addEventListener("click", () => document.querySelector(button.dataset.customerPage === "documents" ? ".customer-documents-panel" : ".customer-table-panel")?.scrollIntoView({ behavior: "smooth", block: "start" })));
+  document.querySelectorAll("[data-customer-page]").forEach(button => button.addEventListener("click", () => { document.querySelectorAll("[data-customer-page]").forEach(item => item.classList.remove("active")); button.classList.add("active"); state.customerPage = button.dataset.customerPage; const target = state.customerPage === "quotes" ? ".customer-quotes-panel" : state.customerPage === "documents" ? ".customer-documents-panel" : ".customer-table-panel"; document.querySelector(target)?.scrollIntoView({ behavior: "smooth", block: "start" }); }));
+  bindCustomerQuoteForm();
 }
 async function loadCustomerData() {
   if (!state.session) return;
-  const [orders, documents] = await Promise.all([
+  const [orders, documents, quotes] = await Promise.all([
     api("rpc/get_customer_orders", { method: "POST", body: "{}" }),
-    api("order_documents?select=*&order=created_at.desc")
+    api("order_documents?select=*&order=created_at.desc"),
+    api("customer_quotes?select=*&order=created_at.desc")
   ]);
-  state.customerOrders = orders || []; state.orders = state.customerOrders; state.documents = documents || [];
+  state.customerOrders = orders || []; state.orders = state.customerOrders; state.documents = documents || []; state.quotes = quotes || [];
 }
 async function switchToCustomerWorkspace() {
   try {
@@ -225,6 +229,94 @@ function documentsView() {
   const table = !rows.length ? emptyState("file", "Chưa có chứng từ", "Tải hóa đơn, biên nhận hoặc chứng từ vận chuyển lên máy chủ.", "new-document") : `<div class="table-wrap"><table><thead><tr><th>TÊN TỆP</th><th>ĐƠN HÀNG</th><th>GHI CHÚ</th><th>DUNG LƯỢNG</th><th>NGÀY TẢI</th><th></th></tr></thead><tbody>${rows.map(d => `<tr><td><span class="file-cell"><i class="file-icon">${icon("file", 17)}</i><span><b>${escapeHTML(d.file_name)}</b><small class="subline">${escapeHTML(d.mime_type || "Tệp đính kèm")}</small></span></span></td><td><b>${escapeHTML(d.order?.code || "—")}</b></td><td>${escapeHTML(d.note || "—")}</td><td>${formatSize(d.file_size)}</td><td>${dateText(d.created_at)}</td><td><div class="row-actions"><button class="icon-button" data-action="download-document" data-id="${d.id}" title="Tải xuống">${icon("download", 16)}</button><button class="icon-button danger" data-action="delete-document" data-id="${d.id}" title="Xóa">${icon("trash", 16)}</button></div></td></tr>`).join("")}</tbody></table></div>`;
   return `<div class="document-note">${icon("shield", 18)} Chứng từ được lưu trong kho riêng tư. Chỉ tài khoản quản trị đã được phê duyệt mới có thể xem hoặc tải tệp.</div><section class="panel table-panel">${toolbar("Tìm tên tệp hoặc mã đơn...")}${table}</section>`;
 }
+
+function quoteCurrencyCny(value) {
+  return new Intl.NumberFormat("vi-VN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(value) || 0) + " ¥";
+}
+function customerQuotesPanel() {
+  const history = (state.quotes || []).map(q => {
+    const approved = q.status === "approved";
+    const displayed = q.convert_to_vnd
+      ? money(approved ? q.final_price_vnd : q.estimated_price_vnd)
+      : quoteCurrencyCny(approved ? q.final_price_cny : q.estimated_price_cny);
+    const status = approved ? "Đã chốt giá" : "Chờ Hunda duyệt";
+    const secondary = q.convert_to_vnd ? '<small class="subline">' + quoteCurrencyCny(approved ? q.final_price_cny : q.estimated_price_cny) + '</small>' : "";
+    const note = q.admin_note ? '<small class="subline">' + escapeHTML(q.admin_note) + '</small>' : "";
+    return '<tr><td><b>' + dateText(q.created_at) + '</b><small class="subline">#' + escapeHTML(String(q.id).slice(0, 8).toUpperCase()) + '</small></td><td>' + Number(q.actual_weight_kg).toLocaleString("vi-VN") + ' kg</td><td>' + Number(q.volume_cbm).toLocaleString("vi-VN") + ' m³</td><td>' + Number(q.chargeable_weight_kg).toLocaleString("vi-VN") + ' kg</td><td><b>' + displayed + '</b>' + secondary + '</td><td><span class="quote-status ' + (approved ? "approved" : "pending") + '">' + status + '</span>' + note + '</td></tr>';
+  }).join("");
+  return '<section class="panel customer-quotes-panel"><div class="panel-heading"><div><h2>Tạo báo giá</h2><p>Gửi thông số hàng hóa để Hunda kiểm tra và chốt giá cuối cùng.</p></div></div>' +
+    '<form id="customer-quote-form" class="customer-quote-form"><div class="customer-quote-fields">' +
+    '<label class="quote-field"><span>Khối lượng thực tế (kg)</span><input id="quote-kgs" type="number" min="0" step="0.001" value="0" inputmode="decimal"></label>' +
+    '<label class="quote-field"><span>Thể tích hàng (CBM)</span><input id="quote-cbm" type="number" min="0" step="0.0001" value="0" inputmode="decimal"></label></div>' +
+    '<p class="quote-formula">Trọng lượng quy đổi = CBM × 250. Trọng lượng tính giá là số lớn hơn giữa kg thực tế và kg quy đổi.</p>' +
+    '<div class="quote-calc-grid"><div><span>Kg quy đổi (x)</span><b id="quote-volume-weight">0 kg</b></div><div><span>Trọng lượng tính giá</span><b id="quote-chargeable-weight">0 kg</b></div><div class="quote-total"><span>Giá tạm tính (e = kg tính giá × 7,75)</span><b id="quote-estimate-cny">0,00 ¥</b></div></div>' +
+    '<label class="quote-convert"><input id="quote-convert-vnd" type="checkbox"><span>Hiển thị thêm VND theo tỷ giá 1 CNY = 3.950 VND</span></label>' +
+    '<div class="quote-vnd-result" id="quote-vnd-result" hidden><span>Giá tạm tính quy đổi (t = e × 3.950)</span><b id="quote-estimate-vnd">0 ₫</b></div>' +
+    '<div class="quote-submit-row"><span>Báo giá sẽ ở trạng thái chờ quản trị viên phê duyệt.</span><button type="submit" class="btn primary">' + icon("arrow", 15) + ' Gửi yêu cầu báo giá</button></div></form>' +
+    '<div class="panel-heading quote-history-heading"><div><h2>Lịch sử báo giá</h2><p>Giá cuối cùng chỉ được áp dụng sau khi Hunda phê duyệt.</p></div></div>' +
+    '<div class="table-wrap"><table><thead><tr><th>NGÀY GỬI</th><th>KG THỰC TẾ</th><th>THỂ TÍCH</th><th>KG TÍNH GIÁ</th><th>GIÁ</th><th>TRẠNG THÁI</th></tr></thead><tbody>' +
+    (history || '<tr><td colspan="6"><div class="empty-compact">Bạn chưa gửi yêu cầu báo giá nào.</div></td></tr>') +
+    '</tbody></table></div></section>';
+}
+function bindCustomerQuoteForm() {
+  const form = document.querySelector("#customer-quote-form");
+  if (!form) return;
+  const refresh = () => {
+    const actual = Math.max(0, Number(form.querySelector("#quote-kgs").value) || 0);
+    const cbm = Math.max(0, Number(form.querySelector("#quote-cbm").value) || 0);
+    const volumeWeight = cbm * 250;
+    const chargeable = Math.max(actual, volumeWeight);
+    const estimate = chargeable * 7.75;
+    form.querySelector("#quote-volume-weight").textContent = volumeWeight.toLocaleString("vi-VN", { maximumFractionDigits: 3 }) + " kg";
+    form.querySelector("#quote-chargeable-weight").textContent = chargeable.toLocaleString("vi-VN", { maximumFractionDigits: 3 }) + " kg";
+    form.querySelector("#quote-estimate-cny").textContent = quoteCurrencyCny(estimate);
+    form.querySelector("#quote-estimate-vnd").textContent = money(estimate * 3950);
+    form.querySelector("#quote-vnd-result").hidden = !form.querySelector("#quote-convert-vnd").checked;
+  };
+  form.querySelectorAll("input").forEach(input => input.addEventListener("input", refresh));
+  form.querySelector("#quote-convert-vnd").addEventListener("change", refresh);
+  form.addEventListener("submit", async event => {
+    event.preventDefault();
+    const actual = Number(form.querySelector("#quote-kgs").value) || 0;
+    const cbm = Number(form.querySelector("#quote-cbm").value) || 0;
+    if (actual <= 0 && cbm <= 0) { showToast("Nhập khối lượng hoặc thể tích hàng trước khi gửi.", "error"); return; }
+    const button = form.querySelector('[type="submit"]');
+    button.disabled = true; button.innerHTML = '<span class="spinner"></span> Đang gửi';
+    try {
+      await api("customer_quotes?select=*", { method: "POST", headers: { Prefer: "return=representation" }, body: JSON.stringify({ actual_weight_kg: actual, volume_cbm: cbm, convert_to_vnd: form.querySelector("#quote-convert-vnd").checked }) });
+      await loadCustomerData(); render(); showToast("Đã gửi yêu cầu báo giá để Hunda phê duyệt.");
+    } catch (error) {
+      fail(error); button.disabled = false; button.innerHTML = icon("arrow", 15) + " Gửi yêu cầu báo giá";
+    }
+  });
+  refresh();
+}
+function quotesView() {
+  const nameFor = userId => state.customerAccounts.find(c => c.user_id === userId)?.full_name || ("Khách hàng · " + String(userId || "").slice(0, 8));
+  const pending = (state.quotes || []).filter(q => q.status === "pending").length;
+  const rows = (state.quotes || []).map(q => {
+    const cny = quoteCurrencyCny(q.status === "approved" ? q.final_price_cny : q.estimated_price_cny);
+    const vnd = q.convert_to_vnd ? '<small class="subline">' + money(q.status === "approved" ? q.final_price_vnd : q.estimated_price_vnd) + '</small>' : "";
+    const status = q.status === "approved" ? '<span class="quote-status approved">Đã chốt giá</span>' : '<span class="quote-status pending">Chờ duyệt</span>';
+    const action = q.status === "pending" ? '<button class="btn primary small" data-action="approve-quote" data-id="' + q.id + '">Chốt giá</button>' : '<span class="quote-finalized">Đã gửi khách</span>';
+    return '<tr><td><b>' + dateText(q.created_at) + '</b><small class="subline">#' + escapeHTML(String(q.id).slice(0, 8).toUpperCase()) + '</small></td><td><b>' + escapeHTML(nameFor(q.user_id)) + '</b></td><td>' + Number(q.actual_weight_kg).toLocaleString("vi-VN") + ' kg<small class="subline">' + Number(q.volume_cbm).toLocaleString("vi-VN") + ' CBM</small></td><td>' + Number(q.chargeable_weight_kg).toLocaleString("vi-VN") + ' kg</td><td><b>' + cny + '</b>' + vnd + '</td><td>' + status + '</td><td>' + action + '</td></tr>';
+  }).join("");
+  return '<div class="stats-grid"><article class="stat-card"><div class="stat-top"><span>Chờ duyệt</span><i class="stat-icon amber">' + icon("clock", 17) + '</i></div><strong>' + pending + '</strong><small>Yêu cầu báo giá mới</small></article><article class="stat-card"><div class="stat-top"><span>Tổng yêu cầu</span><i class="stat-icon blue">' + icon("file", 17) + '</i></div><strong>' + (state.quotes || []).length + '</strong><small>Đồng bộ từ không gian khách hàng</small></article></div>' +
+    '<section class="panel table-panel"><div class="panel-heading"><div><h2>Luồng yêu cầu báo giá</h2><p>Nhập giá cuối cùng để phê duyệt và gửi lại cho khách hàng.</p></div></div><div class="table-wrap"><table><thead><tr><th>NGÀY GỬI</th><th>KHÁCH HÀNG</th><th>KG / CBM</th><th>KG TÍNH GIÁ</th><th>TẠM TÍNH / CHỐT</th><th>TRẠNG THÁI</th><th></th></tr></thead><tbody>' +
+    (rows || '<tr><td colspan="7"><div class="empty-compact">Chưa có yêu cầu báo giá nào.</div></td></tr>') + '</tbody></table></div></section>';
+}
+function quoteApprovalModal(id) {
+  const quote = (state.quotes || []).find(item => item.id === id);
+  if (!quote || quote.status !== "pending") return;
+  const customer = state.customerAccounts.find(item => item.user_id === quote.user_id)?.full_name || "Khách hàng";
+  const fields = field("Khách hàng", "<p>" + escapeHTML(customer) + "</p>") +
+    field("Trọng lượng tính giá", "<p>" + Number(quote.chargeable_weight_kg).toLocaleString("vi-VN") + " kg</p>") +
+    textInput("final_price_cny", "Giá chốt (CNY) *", quote.estimated_price_cny, "Nhập giá chốt", "number", true) +
+    textareaInput("admin_note", "Ghi chú gửi khách", "", "Thời hạn báo giá, điều kiện áp dụng...") +
+    field("Quy đổi", "<p>" + (quote.convert_to_vnd ? money(Number(quote.estimated_price_vnd)) + " (tham khảo theo 3.950 VND/CNY)" : "Khách đang xem giá bằng CNY") + "</p>");
+  openModal("Phê duyệt và chốt báo giá", formShell("quote-approval", quote.id, fields), "Duyệt và gửi giá");
+}
+
 function activityView() {
   const rows = state.activity || [];
   const actionLabel = { INSERT: "Tạo mới", UPDATE: "Cập nhật", DELETE: "Xóa" };
@@ -271,6 +363,7 @@ function action(actionName, id) {
   if (actionName === "switch-customer") { switchToCustomerWorkspace(); return; }
   if (actionName === "switch-admin") { switchToAdminWorkspace(); return; }
   if (actionName === "new-customer-order") return customerOrderModal();
+  if (actionName === "approve-quote") return quoteApprovalModal(id);
   if (actionName === "refresh") { loadData().then(render).catch(fail); return; }
   if (actionName === "new-order") return orderModal();
   if (actionName === "edit-order") return orderModal(state.orders.find(o => o.id === id));
@@ -312,6 +405,10 @@ async function handleRecordSubmit(e) {
     if (kind === "document") await uploadDocument(data);
     else if (kind === "customer-order") {
       await api("rpc/submit_customer_order", { method: "POST", body: JSON.stringify({ p_route: String(data.get("route") || "").trim(), p_cargo_description: String(data.get("cargo_description") || "").trim() || null, p_note: String(data.get("note") || "").trim() || null }) });
+    } else if (kind === "quote-approval") {
+      const finalPrice = Number(data.get("final_price_cny"));
+      if (!Number.isFinite(finalPrice) || finalPrice <= 0) throw new Error("Giá chốt phải lớn hơn 0.");
+      await api("customer_quotes?id=eq." + encodeURIComponent(id), { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "approved", final_price_cny: finalPrice, admin_note: String(data.get("admin_note") || "").trim() || null, approved_by: state.user.id, approved_at: new Date().toISOString(), updated_at: new Date().toISOString() }) });
     } else if (kind === "customer-profile") {
       const profile = Object.fromEntries(data.entries());
       await api(`customer_accounts?user_id=eq.${encodeURIComponent(state.user.id)}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify(profile) });
@@ -354,15 +451,16 @@ async function confirmDelete(label, id, table) {
 
 async function loadData() {
   if (!state.session) return;
-  const [customers, orders, transactions, documents, activity, customerAccounts] = await Promise.all([
+  const [customers, orders, transactions, documents, activity, customerAccounts, quotes] = await Promise.all([
     api("customers?select=*&order=created_at.desc"),
     api("orders?select=*,customer:customers(name)&order=created_at.desc"),
     api("transactions?select=*,customer:customers(name),order:orders(code)&order=transaction_date.desc,created_at.desc"),
     api("order_documents?select=*,order:orders(code)&order=created_at.desc"),
     api("activity_log?select=*&order=occurred_at.desc&limit=200"),
-    api("customer_accounts?select=user_id,customer_id,full_name&order=created_at.desc")
+    api("customer_accounts?select=user_id,customer_id,full_name&order=created_at.desc"),
+    api("customer_quotes?select=*&order=created_at.desc")
   ]);
-  state.customers = customers || []; state.orders = orders || []; state.transactions = transactions || []; state.documents = documents || []; state.activity = activity || []; state.customerAccounts = customerAccounts || [];
+  state.customers = customers || []; state.orders = orders || []; state.transactions = transactions || []; state.documents = documents || []; state.activity = activity || []; state.customerAccounts = customerAccounts || []; state.quotes = quotes || [];
 }
 function startRealtime() {
   if (state.realtime || !window.supabase?.createClient || !state.session?.access_token) return;
