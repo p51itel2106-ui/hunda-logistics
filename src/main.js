@@ -237,7 +237,7 @@ function customerQuotesPanel() {
   const history = (state.quotes || []).map(q => {
     const approved = q.status === "approved";
     const displayed = q.convert_to_vnd
-      ? money(approved ? q.final_price_vnd : q.estimated_price_vnd)
+      ? money(approved ? Number(q.final_price_cny || 0) * 3950 : q.estimated_price_vnd)
       : quoteCurrencyCny(approved ? q.final_price_cny : q.estimated_price_cny);
     const status = approved ? "Đã chốt giá" : "Chờ Hunda duyệt";
     const secondary = q.convert_to_vnd ? '<small class="subline">' + quoteCurrencyCny(approved ? q.final_price_cny : q.estimated_price_cny) + '</small>' : "";
@@ -301,7 +301,7 @@ function quotesView() {
   const pending = (state.quotes || []).filter(q => q.status === "pending").length;
   const rows = (state.quotes || []).map(q => {
     const cny = quoteCurrencyCny(q.status === "approved" ? q.final_price_cny : q.estimated_price_cny);
-    const vnd = q.convert_to_vnd ? '<small class="subline">' + money(q.status === "approved" ? q.final_price_vnd : q.estimated_price_vnd) + '</small>' : "";
+    const vnd = q.convert_to_vnd ? '<small class="subline">' + money(q.status === "approved" ? Number(q.final_price_cny || 0) * 3950 : q.estimated_price_vnd) + '</small>' : "";
     const status = q.status === "approved" ? '<span class="quote-status approved">Đã chốt giá</span>' : '<span class="quote-status pending">Chờ duyệt</span>';
     const action = q.status === "pending" ? '<button class="btn primary small" data-action="approve-quote" data-id="' + q.id + '">Chốt giá</button>' : '<button class="btn ghost small" data-action="approve-quote" data-id="' + q.id + '">Sửa giá</button>';
     return '<tr><td><b>' + dateText(q.created_at) + '</b><small class="subline">#' + escapeHTML(String(q.id).slice(0, 8).toUpperCase()) + '</small></td><td><b>' + escapeHTML(nameFor(q.user_id)) + '</b></td><td>' + Number(q.actual_weight_kg).toLocaleString("vi-VN") + ' kg<small class="subline">' + Number(q.volume_cbm).toLocaleString("vi-VN") + ' CBM</small></td><td>' + Number(q.chargeable_weight_kg).toLocaleString("vi-VN") + ' kg</td><td><b>' + cny + '</b>' + vnd + '</td><td>' + status + '</td><td>' + action + '</td></tr>';
@@ -316,7 +316,7 @@ function quoteApprovalModal(id) {
   const isApproved = quote.status === "approved";
   const customer = state.customerAccounts.find(item => item.user_id === quote.user_id)?.full_name || "Khách hàng";
   const finalPrice = isApproved ? quote.final_price_cny : quote.estimated_price_cny;
-  const finalVnd = isApproved ? quote.final_price_vnd : quote.estimated_price_vnd;
+  const finalVnd = isApproved ? Number(quote.final_price_cny || 0) * 3950 : quote.estimated_price_vnd;
   const fields = field("Khách hàng", "<p>" + escapeHTML(customer) + "</p>") +
     field("Trọng lượng tính giá", "<p>" + Number(quote.chargeable_weight_kg).toLocaleString("vi-VN") + " kg</p>") +
     textInput("final_price_cny", "Giá chốt (CNY) *", finalPrice, "Nhập giá chốt", "number", true) +
