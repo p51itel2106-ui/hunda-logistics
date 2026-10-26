@@ -660,6 +660,6 @@ function bootstrap() {
 document.addEventListener("click", e => { const btn = e.target.closest("[data-action]"); if (btn) action(btn.dataset.action, btn.dataset.id); });
 window.addEventListener("storage", e => { if (e.key === SESSION_KEY) location.reload(); });
 document.addEventListener("visibilitychange", () => { if (!document.hidden && state.session) loadData().then(render).catch(() => {}); });
-setInterval(() => { if (!document.hidden && state.session && state.workspace === "customer") loadCustomerData().then(() => { if (document.querySelector(".app-shell")) render(); }).catch(() => {}); }, 8000);
-setInterval(() => { if (!document.hidden && state.session && state.workspace === "admin") loadData().then(() => { if (document.querySelector(".app-shell")) render(); }).catch(() => {}); }, 45000);
+setInterval(() => { if (!document.hidden && state.session && state.workspace === "customer") loadCustomerData().then(() => { if (document.querySelector(".app-shell") && !document.querySelector(".modal-backdrop")) render(); }).catch(() => {}); }, 8000);
+setInterval(() => { if (!document.hidden && state.session && state.workspace === "admin") loadData().then(() => { if (document.querySelector(".app-shell") && !document.querySelector(".modal-backdrop")) render(); }).catch(() => {}); }, 45000);
 bootstrap();
