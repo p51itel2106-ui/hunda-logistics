@@ -18,7 +18,7 @@ Deno.serve(async (req: Request) => {
   const secret = Deno.env.get("SEPAY_WEBHOOK_API_KEY") || "";
   if (!secret) return json({ success: false, error: "Webhook authentication is not configured." }, 503);
   const authorization = req.headers.get("Authorization") || "";
-  const supplied = authorization.match(/^Apikey\\s+(.+)$/i)?.[1] || "";
+  const supplied = authorization.match(/^Apikey\s+(.+)$/i)?.[1] || "";
   if (!supplied || !secureEquals(supplied, secret)) return json({ success: false, error: "Unauthorized." }, 401);
 
   const url = Deno.env.get("SUPABASE_URL") || "";
@@ -31,7 +31,7 @@ Deno.serve(async (req: Request) => {
     const payload = JSON.parse(raw);
     const id = String(payload?.id ?? "");
     const amount = Number(payload?.transferAmount);
-    if (!/^\\d{1,18}$/.test(id) || !Number.isSafeInteger(amount) || amount < 0) {
+    if (!/^\d{1,18}$/.test(id) || !Number.isSafeInteger(amount) || amount < 0) {
       return json({ success: false, error: "Invalid transaction payload." }, 400);
     }
 
