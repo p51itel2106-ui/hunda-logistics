@@ -4,7 +4,7 @@ const DB_URL = String(cfg.supabaseUrl || "").replace(/\/$/, "");
 const PUBLIC_KEY = cfg.publishableKey || "";
 const BUCKET = "hunda-documents";
 const SESSION_KEY = "hunda-auth-session";
-const state = { page: "dashboard", workspace: "admin", isAdmin: false, customerAccount: null, customerAccounts: [], session: readSession(), user: null, customers: [], orders: [], customerOrders: [], transactions: [], documents: [], quotes: [], activity: [], customerPage: "orders", search: "", month: new Date().toISOString().slice(0, 7), realtime: null };
+const state = { page: "dashboard", workspace: "admin", isAdmin: false, customerAccount: null, customerAccounts: [], session: readSession(), user: null, customers: [], orders: [], customerOrders: [], transactions: [], documents: [], quotes: [], quoteDraft: { actual: "0", cbm: "0", convert: false }, activity: [], customerPage: "orders", search: "", month: new Date().toISOString().slice(0, 7), realtime: null };
 
 const icons = {
   grid: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
@@ -246,11 +246,11 @@ function customerQuotesPanel() {
   }).join("");
   return '<section class="panel customer-quotes-panel"><div class="panel-heading"><div><h2>Tạo báo giá</h2><p>Gửi thông số hàng hóa để Hunda kiểm tra và chốt giá cuối cùng.</p></div></div>' +
     '<form id="customer-quote-form" class="customer-quote-form"><div class="customer-quote-fields">' +
-    '<label class="quote-field"><span>Khối lượng thực tế (kg)</span><input id="quote-kgs" type="number" min="0" step="0.001" value="0" inputmode="decimal"></label>' +
-    '<label class="quote-field"><span>Thể tích hàng (CBM)</span><input id="quote-cbm" type="number" min="0" step="0.0001" value="0" inputmode="decimal"></label></div>' +
+    '<label class="quote-field"><span>Khối lượng thực tế (kg)</span><input id="quote-kgs" type="number" min="0" step="0.001" value="" + escapeHTML(state.quoteDraft?.actual ?? "0") + "" inputmode="decimal"></label>' +
+    '<label class="quote-field"><span>Thể tích hàng (CBM)</span><input id="quote-cbm" type="number" min="0" step="0.0001" value="" + escapeHTML(state.quoteDraft?.cbm ?? "0") + "" inputmode="decimal"></label></div>' +
     '<p class="quote-formula">Trọng lượng quy đổi = CBM × 250. Trọng lượng tính giá là số lớn hơn giữa kg thực tế và kg quy đổi.</p>' +
     '<div class="quote-calc-grid"><div><span>Kg quy đổi (x)</span><b id="quote-volume-weight">0 kg</b></div><div><span>Trọng lượng tính giá</span><b id="quote-chargeable-weight">0 kg</b></div><div class="quote-total"><span>Giá tạm tính (e = kg tính giá × 7,75)</span><b id="quote-estimate-cny">0,00 ¥</b></div></div>' +
-    '<label class="quote-convert"><input id="quote-convert-vnd" type="checkbox"><span>Hiển thị thêm VND theo tỷ giá 1 CNY = 3.950 VND</span></label>' +
+    '<label class="quote-convert"><input id="quote-convert-vnd" type="checkbox" " + (state.quoteDraft?.convert ? "checked" : "") + "><span>Hiển thị thêm VND theo tỷ giá 1 CNY = 3.950 VND</span></label>' +
     '<div class="quote-vnd-result" id="quote-vnd-result" hidden><span>Giá tạm tính quy đổi (t = e × 3.950)</span><b id="quote-estimate-vnd">0 ₫</b></div>' +
     '<div class="quote-submit-row"><span>Báo giá sẽ ở trạng thái chờ quản trị viên phê duyệt.</span><button type="submit" class="btn primary">' + icon("arrow", 15) + ' Gửi yêu cầu báo giá</button></div></form>' +
     '<div class="panel-heading quote-history-heading"><div><h2>Lịch sử báo giá</h2><p>Giá cuối cùng chỉ được áp dụng sau khi Hunda phê duyệt.</p></div></div>' +
@@ -262,8 +262,12 @@ function bindCustomerQuoteForm() {
   const form = document.querySelector("#customer-quote-form");
   if (!form) return;
   const refresh = () => {
-    const actual = Math.max(0, Number(form.querySelector("#quote-kgs").value) || 0);
-    const cbm = Math.max(0, Number(form.querySelector("#quote-cbm").value) || 0);
+    const actualInput = form.querySelector("#quote-kgs");
+    const cbmInput = form.querySelector("#quote-cbm");
+    const convertInput = form.querySelector("#quote-convert-vnd");
+    state.quoteDraft = { actual: actualInput.value, cbm: cbmInput.value, convert: convertInput.checked };
+    const actual = Math.max(0, Number(actualInput.value) || 0);
+    const cbm = Math.max(0, Number(cbmInput.value) || 0);
     const volumeWeight = cbm * 250;
     const chargeable = Math.max(actual, volumeWeight);
     const estimate = chargeable * 7.75;
@@ -271,7 +275,7 @@ function bindCustomerQuoteForm() {
     form.querySelector("#quote-chargeable-weight").textContent = chargeable.toLocaleString("vi-VN", { maximumFractionDigits: 3 }) + " kg";
     form.querySelector("#quote-estimate-cny").textContent = quoteCurrencyCny(estimate);
     form.querySelector("#quote-estimate-vnd").textContent = money(estimate * 3950);
-    form.querySelector("#quote-vnd-result").hidden = !form.querySelector("#quote-convert-vnd").checked;
+    form.querySelector("#quote-vnd-result").hidden = !convertInput.checked;
   };
   form.querySelectorAll("input").forEach(input => input.addEventListener("input", refresh));
   form.querySelector("#quote-convert-vnd").addEventListener("change", refresh);
@@ -284,6 +288,7 @@ function bindCustomerQuoteForm() {
     button.disabled = true; button.innerHTML = '<span class="spinner"></span> Đang gửi';
     try {
       await api("customer_quotes?select=*", { method: "POST", headers: { Prefer: "return=representation" }, body: JSON.stringify({ actual_weight_kg: actual, volume_cbm: cbm, convert_to_vnd: form.querySelector("#quote-convert-vnd").checked }) });
+      state.quoteDraft = { actual: "0", cbm: "0", convert: false };
       await loadCustomerData(); render(); showToast("Đã gửi yêu cầu báo giá để Hunda phê duyệt.");
     } catch (error) {
       fail(error); button.disabled = false; button.innerHTML = icon("arrow", 15) + " Gửi yêu cầu báo giá";
