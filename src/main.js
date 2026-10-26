@@ -4,7 +4,7 @@ const DB_URL = String(cfg.supabaseUrl || "").replace(/\/$/, "");
 const PUBLIC_KEY = cfg.publishableKey || "";
 const BUCKET = "hunda-documents";
 const SESSION_KEY = "hunda-auth-session";
-const state = { page: "dashboard", session: readSession(), user: null, customers: [], orders: [], transactions: [], documents: [], search: "", month: new Date().toISOString().slice(0, 7) };
+const state = { page: "dashboard", workspace: "admin", isAdmin: false, customerAccount: null, customerAccounts: [], session: readSession(), user: null, customers: [], orders: [], customerOrders: [], transactions: [], documents: [], activity: [], search: "", month: new Date().toISOString().slice(0, 7), realtime: null };
 
 const icons = {
   grid: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
@@ -85,29 +85,29 @@ function authShell(view = "login", message = "") {
   const reset = view === "reset";
   const heading = signup ? "Tạo tài khoản Hunda" : forgot ? "Khôi phục mật khẩu" : reset ? "Đặt mật khẩu mới" : "Chào mừng trở lại";
   const subheading = signup ? "Thông tin công việc và xuất hóa đơn của bạn." : forgot ? "Nhập email để nhận liên kết đặt lại mật khẩu." : reset ? "Chọn mật khẩu mới cho tài khoản của bạn." : "Đăng nhập để tiếp tục công việc hôm nay.";
-  const authFields = signup ? `<div class="auth-fields auth-fields-signup"><label>Họ và tên<input name="full_name" autocomplete="name" placeholder="Nguyễn Văn An" required /></label><label>Số điện thoại<input name="phone" type="tel" autocomplete="tel" placeholder="09xx xxx xxx" required /></label><label>Tên công ty<input name="billing_company" autocomplete="organization" placeholder="Tên công ty" /></label><label class="auth-field-wide">Email công việc<input name="email" type="email" autocomplete="email" placeholder="ten@congty.vn" required /></label><label>Mật khẩu<input name="password" type="password" autocomplete="new-password" minlength="8" placeholder="Tối thiểu 8 ký tự" required /></label><label>Nhập lại mật khẩu<input name="confirm" type="password" autocomplete="new-password" minlength="8" placeholder="Nhập lại mật khẩu" required /></label></div><div class="invoice-heading"><b>Thông tin xuất hóa đơn</b><span>Có thể bổ sung hoặc chỉnh sửa sau</span></div><div class="auth-fields invoice-fields"><label>Mã số thuế<input name="billing_tax_code" placeholder="Mã số thuế" /></label><label class="auth-field-wide">Địa chỉ xuất hóa đơn<input name="billing_address" autocomplete="street-address" placeholder="Số nhà, đường, quận/huyện, tỉnh/thành" /></label><label class="auth-field-wide">Email nhận hóa đơn<input name="billing_email" type="email" autocomplete="email" placeholder="ketoan@congty.vn" /></label></div>` : forgot ? `<label>Email công việc<input name="email" type="email" autocomplete="email" placeholder="ten@congty.vn" required /></label>` : reset ? `<label>Mật khẩu mới<input name="password" type="password" autocomplete="new-password" minlength="8" placeholder="Tối thiểu 8 ký tự" required /></label><label>Nhập lại mật khẩu<input name="confirm" type="password" autocomplete="new-password" minlength="8" placeholder="Nhập lại mật khẩu" required /></label>` : `<label>Email công việc<input name="email" type="email" autocomplete="email" placeholder="ten@congty.vn" required /></label><label>Mật khẩu<input name="password" type="password" autocomplete="current-password" minlength="8" placeholder="Mật khẩu của bạn" required /></label><button class="forgot-link" type="button" data-auth-view="forgot">Quên mật khẩu?</button>`;
+  const authFields = signup ? `<div class="auth-fields auth-fields-signup"><label>Họ và tên<input name="full_name" autocomplete="name" placeholder="Nguyễn Văn An" required /></label><label>Số điện thoại<input name="phone" type="tel" autocomplete="tel" placeholder="09xx xxx xxx" required /></label><label class="auth-field-wide">Email công việc<input name="email" type="email" autocomplete="email" placeholder="ten@congty.vn" required /></label><label>Mật khẩu<input name="password" type="password" autocomplete="new-password" minlength="8" placeholder="Tối thiểu 8 ký tự" required /></label><label>Nhập lại mật khẩu<input name="confirm" type="password" autocomplete="new-password" minlength="8" placeholder="Nhập lại mật khẩu" required /></label></div><div class="invoice-heading"><b>Thông tin xuất hóa đơn</b><span>Có thể bổ sung hoặc chỉnh sửa sau</span></div><div class="auth-fields invoice-fields"><label>Tên công ty<input name="billing_company" autocomplete="organization" placeholder="Tên công ty" /></label><label>Mã số thuế<input name="billing_tax_code" placeholder="Mã số thuế" /></label><label class="auth-field-wide">Địa chỉ xuất hóa đơn<input name="billing_address" autocomplete="street-address" placeholder="Số nhà, đường, quận/huyện, tỉnh/thành" /></label><label class="auth-field-wide">Email nhận hóa đơn<input name="billing_email" type="email" autocomplete="email" placeholder="ketoan@congty.vn" /></label></div>` : forgot ? `<label>Email công việc<input name="email" type="email" autocomplete="email" placeholder="ten@congty.vn" required /></label>` : reset ? `<label>Mật khẩu mới<input name="password" type="password" autocomplete="new-password" minlength="8" placeholder="Tối thiểu 8 ký tự" required /></label><label>Nhập lại mật khẩu<input name="confirm" type="password" autocomplete="new-password" minlength="8" placeholder="Nhập lại mật khẩu" required /></label>` : `<label>Email công việc<input name="email" type="email" autocomplete="email" placeholder="ten@congty.vn" required /></label><label>Mật khẩu<input name="password" type="password" autocomplete="current-password" minlength="8" placeholder="Mật khẩu của bạn" required /></label><button class="forgot-link" type="button" data-auth-view="forgot">Quên mật khẩu?</button>`;
   const actionLabel = signup ? "Tạo tài khoản" : forgot ? "Gửi liên kết khôi phục" : reset ? "Cập nhật mật khẩu" : "Đăng nhập";
   const switchView = signup ? "login" : (forgot || reset) ? "login" : "signup";
   const switchText = signup ? "Đã có tài khoản?" : (forgot || reset) ? "Đã nhớ mật khẩu?" : "Chưa có tài khoản?";
   const switchLabel = signup || forgot || reset ? "Đăng nhập" : "Tạo tài khoản";
   const successMessage = /Nếu email thuộc|Mật khẩu đã được cập nhật|Tài khoản đã được tạo/.test(message);
-  root.innerHTML = `<main class="auth-page"><div class="auth-left"><div class="auth-copy"><span class="eyebrow">VẬN HÀNH TRONG MỘT NƠI</span><h1>Quản lý hành trình.<br><em>Nắm chắc dòng tiền.</em></h1><p>Đơn hàng, khách hàng, chứng từ và tài chính được đồng bộ an toàn trên mọi thiết bị.</p><div class="auth-proof"><span>${icon("shield", 17)} Dữ liệu riêng tư</span><span>${icon("refresh", 17)} Đồng bộ máy chủ</span></div></div><div class="auth-visual" aria-label="Vận tải đường bộ và đường biển"><div class="auth-photo auth-photo-truck"><span>${icon("truck", 15)} VẬN TẢI ĐƯỜNG BỘ</span></div><div class="auth-photo auth-photo-container"><span>${icon("box", 15)} HÀNG CONTAINER</span></div><div class="auth-photo auth-photo-ship"><span>${icon("box", 15)} VẬN TẢI ĐƯỜNG BIỂN</span></div></div><div class="auth-foot">© ${new Date().getFullYear()} Hunda Logistics</div></div><section class="auth-right"><div class="auth-brand"><img src="/assets/hunda-logo.jpg" alt="Hunda Bus Logistics" /></div><div class="auth-content-wrap"><div class="auth-form-wrap"><span class="eyebrow">${signup ? "TẠO TÀI KHOẢN" : reset ? "BẢO MẬT TÀI KHOẢN" : forgot ? "HỖ TRỢ ĐĂNG NHẬP" : "KHU VỰC QUẢN TRỊ"}</span><h2>${heading}</h2><p class="muted">${subheading}</p>${message ? `<div class="form-alert ${successMessage ? "success" : ""}">${escapeHTML(message)}</div>` : ""}<form id="auth-form" data-view="${view}">${authFields}<button class="btn primary wide" type="submit">${actionLabel}${icon("arrow", 17)}</button></form><p class="auth-switch">${switchText} <button class="text-button" data-auth-view="${switchView}">${switchLabel}</button></p><div class="auth-safe">${icon("shield", 15)} Tài khoản mới cần được quản trị viên phê duyệt quyền truy cập.</div></div></div></section></main><div id="toast-host" class="toast-host"></div>`;
+  root.innerHTML = `<main class="auth-page"><div class="auth-left"><div class="auth-copy"><span class="eyebrow">VẬN HÀNH TRONG MỘT NƠI</span><h1>Quản lý hành trình.<br><em>Nắm chắc dòng tiền.</em></h1><p>Đơn hàng, khách hàng, chứng từ và tài chính được đồng bộ an toàn trên mọi thiết bị.</p><div class="auth-proof"><span>${icon("shield", 17)} Dữ liệu riêng tư</span><span>${icon("refresh", 17)} Đồng bộ máy chủ</span></div></div><div class="auth-visual" aria-label="Vận tải đường bộ và đường biển"><div class="auth-photo auth-photo-truck"><span>${icon("truck", 15)} VẬN TẢI ĐƯỜNG BỘ</span></div><div class="auth-photo auth-photo-ship"><span>${icon("box", 15)} VẬN TẢI ĐƯỜNG BIỂN</span></div></div><div class="auth-foot">© ${new Date().getFullYear()} Hunda Logistics</div></div><section class="auth-right"><div class="auth-brand"><img src="/assets/hunda-logo.jpg" alt="Hunda Bus Logistics" /></div><div class="auth-content-wrap"><div class="auth-form-wrap"><span class="eyebrow">${signup ? "TẠO TÀI KHOẢN" : reset ? "BẢO MẬT TÀI KHOẢN" : forgot ? "HỖ TRỢ ĐĂNG NHẬP" : "KHÁCH HÀNG & QUẢN TRỊ"}</span><h2>${heading}</h2><p class="muted">${subheading}</p>${message ? `<div class="form-alert ${successMessage ? "success" : ""}">${escapeHTML(message)}</div>` : ""}<form id="auth-form" data-view="${view}">${authFields}<button class="btn primary wide" type="submit">${actionLabel}${icon("arrow", 17)}</button></form><p class="auth-switch">${switchText} <button class="text-button" data-auth-view="${switchView}">${switchLabel}</button></p><div class="auth-safe">${icon("shield", 15)} Tài khoản mới vào không gian khách hàng; quyền quản trị được cấp riêng.</div></div></div></section></main><div id="toast-host" class="toast-host"></div>`;
   bindAuth();
 }
 
 function renderPending(email) {
-  root.innerHTML = `<main class="setup-page"><section class="setup-card pending-card"><img class="setup-logo" src="/assets/hunda-logo.jpg" alt="Hunda Bus Logistics" /><div class="eyebrow">ĐANG CHỜ DUYỆT</div><h1>Tài khoản chưa được cấp quyền</h1><p><b>${escapeHTML(email || "")}</b> đã đăng nhập, nhưng chưa có quyền quản trị Hunda Logistics.</p><p>Chủ tài khoản cần thêm User ID của bạn vào bảng <code>public.admin_users</code> trong Supabase SQL Editor. Xem hướng dẫn trong README của dự án.</p><button class="btn ghost" id="logout-pending">${icon("logout", 16)} Đăng xuất</button></section></main>`;
+  root.innerHTML = `<main class="setup-page"><section class="setup-card pending-card"><img class="setup-logo" src="/assets/hunda-logo.jpg" alt="Hunda Bus Logistics" /><div class="eyebrow">CHƯA CÓ HỒ SƠ</div><h1>Không tìm thấy hồ sơ truy cập</h1><p><b>${escapeHTML(email || "")}</b> chưa có hồ sơ khách hàng hoặc quyền quản trị Hunda Logistics.</p><p>Nếu đây là tài khoản mới, hãy liên hệ Hunda để kiểm tra trạng thái xác nhận email và hồ sơ đồng bộ.</p><button class="btn ghost" id="logout-pending">${icon("logout", 16)} Đăng xuất</button></section></main>`;
   document.querySelector("#logout-pending")?.addEventListener("click", signOut);
 }
 
 const pages = [
-  ["dashboard", "Tổng quan", "grid"], ["orders", "Đơn hàng", "box"], ["customers", "Khách hàng", "users"], ["transactions", "Thu chi", "wallet"], ["reports", "Báo cáo tài chính", "chart"], ["documents", "Chứng từ", "file"]
+  ["dashboard", "Tổng quan", "grid"], ["orders", "Đơn hàng", "box"], ["customers", "Khách hàng", "users"], ["transactions", "Thu chi", "wallet"], ["reports", "Báo cáo tài chính", "chart"], ["documents", "Chứng từ", "file"], ["activity", "Nhật ký thao tác", "clock"]
 ];
-const pageTitles = { dashboard: ["Tổng quan", "Theo dõi hoạt động và dòng tiền của Hunda Logistics."], orders: ["Đơn hàng", "Quản lý vận chuyển từ lúc tiếp nhận đến khi hoàn tất."], customers: ["Khách hàng", "Lưu thông tin và theo dõi lịch sử hợp tác."], transactions: ["Thu chi", "Ghi nhận các khoản thu, chi và trạng thái thanh toán."], reports: ["Báo cáo tài chính", "Dòng tiền và kết quả theo các giao dịch đã xác nhận."], documents: ["Chứng từ", "Tệp đính kèm được lưu trong kho riêng tư trên máy chủ."] };
+const pageTitles = { dashboard: ["Tổng quan", "Theo dõi hoạt động và dòng tiền của Hunda Logistics."], orders: ["Đơn hàng", "Quản lý vận chuyển từ lúc tiếp nhận đến khi hoàn tất."], customers: ["Khách hàng", "Lưu thông tin và theo dõi lịch sử hợp tác."], transactions: ["Thu chi", "Ghi nhận các khoản thu, chi và trạng thái thanh toán."], reports: ["Báo cáo tài chính", "Dòng tiền và kết quả theo các giao dịch đã xác nhận."], documents: ["Chứng từ", "Tệp đính kèm được lưu trong kho riêng tư trên máy chủ."], activity: ["Nhật ký thao tác", "Theo dõi thay đổi đơn hàng, khách hàng, thu chi và chứng từ."] };
 
 function shell(content) {
   const [title, subtitle] = pageTitles[state.page];
-  root.innerHTML = `<div class="app-shell"><aside class="sidebar" id="sidebar"><div class="brand"><img class="brand-emblem" src="/assets/hunda-emblem.jpg" alt="" /><div><b>HUNDA <em>BUS</em></b><small>LOGISTICS × E-COMMERCE</small></div><button class="sidebar-close" id="close-sidebar" aria-label="Đóng menu">${icon("close", 17)}</button></div><div class="workspace"><span class="workspace-dot"></span><span><b>Hunda Logistics</b><small>Không gian vận hành</small></span>${icon("dots", 16)}</div><div class="nav-label">LÀM VIỆC</div><nav>${pages.map(([id, label, ico]) => `<button class="nav-item ${state.page === id ? "active" : ""}" data-page="${id}">${icon(ico, 18)}<span>${label}</span>${id === "orders" && state.orders.filter(o => !["completed", "cancelled"].includes(o.status)).length ? `<small>${state.orders.filter(o => !["completed", "cancelled"].includes(o.status)).length}</small>` : ""}</button>`).join("")}</nav><div class="sidebar-bottom"><div class="sync-card"><span class="sync-dot"></span><div><b>Đã đồng bộ</b><small>Dữ liệu trên máy chủ</small></div>${icon("refresh", 15)}</div><div class="user-row"><span class="avatar">${escapeHTML((state.user?.email || "H").slice(0, 1).toUpperCase())}</span><span class="user-info"><b>${escapeHTML(state.user?.email || "Quản trị viên")}</b><small>Quản trị viên</small></span><button class="icon-button logout-button" id="logout" title="Đăng xuất">${icon("logout", 17)}</button></div></div></aside><div class="sidebar-scrim" id="sidebar-scrim"></div><main class="main-area"><header class="topbar"><button class="mobile-menu icon-button" id="open-sidebar">${icon("menu", 20)}</button><div class="breadcrumb">Hunda Logistics <span>/</span> <b>${title}</b></div><div class="top-actions"><span class="sync-label">${icon("refresh", 15)} Đồng bộ máy chủ</span><button class="icon-button" id="refresh" title="Làm mới dữ liệu">${icon("refresh", 18)}</button><span class="top-avatar">${escapeHTML((state.user?.email || "H").slice(0, 1).toUpperCase())}</span></div></header><div class="page-content"><div class="page-heading"><div><span class="eyebrow">HUNDA LOGISTICS</span><h1>${title}</h1><p>${subtitle}</p></div><div class="heading-actions">${pageAction()}</div></div>${content}</div></main></div><div id="modal-root"></div><div id="toast-host" class="toast-host"></div>`;
+  root.innerHTML = `<div class="app-shell"><aside class="sidebar" id="sidebar"><div class="brand"><img class="brand-emblem" src="/assets/hunda-emblem.jpg" alt="" /><div><b>HUNDA <em>BUS</em></b><small>LOGISTICS × E-COMMERCE</small></div><button class="sidebar-close" id="close-sidebar" aria-label="Đóng menu">${icon("close", 17)}</button></div><div class="workspace"><span class="workspace-dot"></span><span><b>Hunda Logistics</b><small>Không gian quản trị</small></span>${icon("dots", 16)}</div><div class="nav-label">LÀM VIỆC</div><nav>${pages.map(([id, label, ico]) => `<button class="nav-item ${state.page === id ? "active" : ""}" data-page="${id}">${icon(ico, 18)}<span>${label}</span>${id === "orders" && state.orders.filter(o => !["completed", "cancelled"].includes(o.status)).length ? `<small>${state.orders.filter(o => !["completed", "cancelled"].includes(o.status)).length}</small>` : ""}</button>`).join("")}</nav><div class="sidebar-bottom"><div class="sync-card"><span class="sync-dot"></span><div><b>Đã đồng bộ</b><small>Dữ liệu trên máy chủ</small></div>${icon("refresh", 15)}</div><div class="user-row"><span class="avatar">${escapeHTML((state.user?.email || "H").slice(0, 1).toUpperCase())}</span><span class="user-info"><b>${escapeHTML(state.user?.email || "Quản trị viên")}</b><small>Quản trị viên</small></span><button class="icon-button logout-button" id="logout" title="Đăng xuất">${icon("logout", 17)}</button></div></div></aside><div class="sidebar-scrim" id="sidebar-scrim"></div><main class="main-area"><header class="topbar"><button class="mobile-menu icon-button" id="open-sidebar">${icon("menu", 20)}</button><div class="breadcrumb">Hunda Logistics <span>/</span> <b>${title}</b></div><div class="top-actions">${state.isAdmin ? `<button class="btn ghost small" data-action="switch-customer">${icon("users", 15)} Không gian khách hàng</button>` : ""}<span class="sync-label">${icon("refresh", 15)} Đồng bộ máy chủ</span><button class="icon-button" id="refresh" title="Làm mới dữ liệu">${icon("refresh", 18)}</button><span class="top-avatar">${escapeHTML((state.user?.email || "H").slice(0, 1).toUpperCase())}</span></div></header><div class="page-content"><div class="page-heading"><div><span class="eyebrow">HUNDA LOGISTICS</span><h1>${title}</h1><p>${subtitle}</p></div><div class="heading-actions">${pageAction()}</div></div>${content}</div></main></div><div id="modal-root"></div><div id="toast-host" class="toast-host"></div>`;
   bindShell();
 }
 function pageAction() {
@@ -115,6 +115,7 @@ function pageAction() {
   if (state.page === "customers") return `<button class="btn primary" data-action="new-customer">${icon("plus", 17)} Thêm khách hàng</button>`;
   if (state.page === "transactions") return `<button class="btn primary" data-action="new-transaction">${icon("plus", 17)} Ghi nhận thu chi</button>`;
   if (state.page === "documents") return `<button class="btn primary" data-action="new-document">${icon("upload", 17)} Tải chứng từ</button>`;
+  if (state.page === "activity") return `<span class="live-badge ${state.realtimeStatus === "SUBSCRIBED" ? "connected" : ""}"><i></i>${state.realtimeStatus === "SUBSCRIBED" ? "Đang đồng bộ trực tiếp" : "Đang kết nối · làm mới dự phòng"} · UTC+7</span>`;
   if (state.page === "reports") return `<label class="month-control">${icon("calendar", 16)}<input type="month" id="report-month" value="${state.month}" /></label>`;
   return `<button class="btn ghost" data-page="orders">${icon("box", 16)} Xem đơn hàng</button>`;
 }
@@ -130,12 +131,52 @@ function bindShell() {
 }
 function closeNav() { document.body.classList.remove("nav-open"); }
 function render() {
+  if (state.workspace === "customer") return customerWorkspaceView();
   if (state.page === "dashboard") return shell(dashboardView());
   if (state.page === "orders") return shell(ordersView());
   if (state.page === "customers") return shell(customersView());
   if (state.page === "transactions") return shell(transactionsView());
   if (state.page === "reports") return shell(reportsView());
+  if (state.page === "activity") return shell(activityView());
   return shell(documentsView());
+}
+function customerWorkspaceView() {
+  const orders = state.customerOrders || [];
+  const active = orders.filter(o => !["completed", "cancelled"].includes(o.status)).length;
+  const statusText = { new: "Đã tiếp nhận", in_progress: "Đang vận chuyển", completed: "Hoàn tất", cancelled: "Đã hủy" };
+  const orderRows = orders.length ? orders.map(order => {
+    const docs = state.documents.filter(d => d.order_id === order.id);
+    return `<tr><td><b class="order-code">${escapeHTML(order.code)}</b><small class="subline">${dateText(order.created_at)}</small></td><td><b>${escapeHTML(order.route || "—")}</b><small class="subline">${escapeHTML(order.cargo_description || "Chưa có mô tả hàng")}</small></td><td><span class="pill ${escapeHTML(order.status)}"><i></i>${statusText[order.status] || escapeHTML(order.status)}</span></td><td>${docs.length} tệp</td><td><div class="row-actions"><button class="btn ghost small" data-action="order-document" data-id="${order.id}">${icon("upload", 14)} Chứng từ</button></div></td></tr>`;
+  }).join("") : `<tr><td colspan="5"><div class="empty-state customer-empty"><span class="empty-icon">${icon("box", 24)}</span><b>Chưa có yêu cầu đơn hàng</b><p>Gửi thông tin tuyến vận chuyển để Hunda tiếp nhận và phản hồi trạng thái.</p><button class="btn primary small" data-action="new-customer-order">${icon("plus", 15)} Tạo yêu cầu</button></div></td></tr>`;
+  const documents = state.documents.length ? state.documents.map(doc => {
+    const order = orders.find(o => o.id === doc.order_id);
+    return `<tr><td><b>${escapeHTML(doc.file_name)}</b><small class="subline">${escapeHTML(doc.note || doc.mime_type || "Chứng từ")}</small></td><td>${escapeHTML(order?.code || "—")}</td><td>${dateText(doc.created_at)}</td><td><div class="row-actions"><button class="icon-button" data-action="download-document" data-id="${doc.id}" title="Tải xuống">${icon("download", 16)}</button><button class="icon-button danger" data-action="delete-document" data-id="${doc.id}" title="Xóa">${icon("trash", 16)}</button></div></td></tr>`;
+  }).join("") : `<tr><td colspan="4"><div class="empty-compact">Chứng từ của các đơn hàng sẽ xuất hiện tại đây.</div></td></tr>`;
+  root.innerHTML = `<div class="app-shell customer-app"><aside class="sidebar"><div class="brand"><img class="brand-emblem" src="/assets/hunda-emblem.jpg" alt="" /><div><b>HUNDA <em>BUS</em></b><small>LOGISTICS × E-COMMERCE</small></div></div><div class="workspace"><span class="workspace-dot"></span><span><b>Hunda Logistics</b><small>Không gian khách hàng</small></span>${icon("dots", 16)}</div><div class="nav-label">ĐƠN HÀNG</div><nav><button class="nav-item active" data-customer-page="orders">${icon("box", 18)}<span>Đơn hàng của tôi</span>${active ? `<small>${active}</small>` : ""}</button><button class="nav-item" data-customer-page="documents">${icon("file", 18)}<span>Chứng từ đơn hàng</span></button></nav><div class="sidebar-bottom"><div class="sync-card"><span class="sync-dot"></span><div><b>Đã đồng bộ</b><small>Yêu cầu lên máy chủ</small></div>${icon("refresh", 15)}</div><div class="user-row"><span class="avatar">${escapeHTML((state.customerAccount?.full_name || state.user?.email || "K").slice(0, 1).toUpperCase())}</span><span class="user-info"><b>${escapeHTML(state.customerAccount?.full_name || state.user?.email || "Khách hàng")}</b><small>Khách hàng</small></span><button class="icon-button logout-button" id="logout" title="Đăng xuất">${icon("logout", 17)}</button></div></div></aside><main class="main-area"><header class="topbar"><div class="breadcrumb">Hunda Logistics <span>/</span> <b>Không gian khách hàng</b></div><div class="top-actions">${state.isAdmin ? `<button class="btn ghost small" data-action="switch-admin">${icon("shield", 15)} Trở về quản trị</button>` : ""}<span class="sync-label">${icon("refresh", 15)} Đồng bộ đơn hàng</span><button class="icon-button" id="customer-refresh" title="Làm mới">${icon("refresh", 18)}</button><button class="icon-button" id="logout-customer" title="Đăng xuất">${icon("logout", 17)}</button></div></header><div class="page-content"><div class="page-heading"><div><span class="eyebrow">CỔNG KHÁCH HÀNG</span><h1>Đơn hàng của tôi</h1><p>Tạo yêu cầu vận chuyển và theo dõi các cập nhật từ Hunda Logistics.</p></div><div class="heading-actions"><button class="btn primary" data-action="new-customer-order">${icon("plus", 17)} Tạo yêu cầu đơn hàng</button></div></div><div class="welcome-strip"><div class="welcome-art">${icon("truck", 30)}</div><div><b>Xin chào, ${escapeHTML(state.customerAccount?.full_name || "Quý khách")}</b><span>Thông tin đơn hàng của bạn được đồng bộ với đội ngũ Hunda.</span></div></div><div class="stats-grid customer-stats"><article class="stat-card"><div class="stat-top"><span>Tổng yêu cầu</span><i class="stat-icon blue">${icon("box", 17)}</i></div><strong>${orders.length}</strong><small>Đơn hàng của bạn</small></article><article class="stat-card"><div class="stat-top"><span>Đang xử lý</span><i class="stat-icon amber">${icon("clock", 17)}</i></div><strong>${active}</strong><small>Chờ tiếp nhận hoặc đang vận chuyển</small></article><article class="stat-card"><div class="stat-top"><span>Đã hoàn tất</span><i class="stat-icon green">${icon("check", 17)}</i></div><strong>${orders.filter(o => o.status === "completed").length}</strong><small>Đơn hàng hoàn tất</small></article><article class="stat-card"><div class="stat-top"><span>Chứng từ</span><i class="stat-icon coral">${icon("file", 17)}</i></div><strong>${state.documents.length}</strong><small>Tệp đính kèm trên máy chủ</small></article></div><section class="panel table-panel customer-table-panel"><div class="panel-heading"><div><h2>Tiến trình đơn hàng</h2><p>Trạng thái được cập nhật tự động khi Hunda xử lý.</p></div></div><div class="table-wrap"><table><thead><tr><th>MÃ YÊU CẦU</th><th>TUYẾN / HÀNG HÓA</th><th>TRẠNG THÁI</th><th>CHỨNG TỪ</th><th></th></tr></thead><tbody>${orderRows}</tbody></table></div></section><section class="panel table-panel customer-documents-panel"><div class="panel-heading"><div><h2>Chứng từ đơn hàng</h2><p>Tệp bạn đã gửi được lưu trên máy chủ riêng tư.</p></div></div><div class="table-wrap"><table><thead><tr><th>TÊN TỆP</th><th>ĐƠN HÀNG</th><th>NGÀY TẢI</th><th></th></tr></thead><tbody>${documents}</tbody></table></div></section><p class="customer-footer-note">Thông tin trạng thái sẽ tự làm mới định kỳ và được chuyển đến bộ phận quản trị.</p></div></main></div><div id="modal-root"></div><div id="toast-host" class="toast-host"></div>`;
+  document.querySelector("#logout")?.addEventListener("click", signOut);
+  document.querySelector("#logout-customer")?.addEventListener("click", signOut);
+  document.querySelector("#customer-refresh")?.addEventListener("click", () => loadCustomerData().then(render).catch(fail));
+  document.querySelectorAll("[data-customer-page]").forEach(button => button.addEventListener("click", () => document.querySelector(button.dataset.customerPage === "documents" ? ".customer-documents-panel" : ".customer-table-panel")?.scrollIntoView({ behavior: "smooth", block: "start" })));
+}
+async function loadCustomerData() {
+  if (!state.session) return;
+  const [orders, documents] = await Promise.all([
+    api("rpc/get_customer_orders", { method: "POST", body: "{}" }),
+    api("order_documents?select=*&order=created_at.desc")
+  ]);
+  state.customerOrders = orders || []; state.orders = state.customerOrders; state.documents = documents || [];
+}
+async function switchToCustomerWorkspace() {
+  try {
+    await api("rpc/ensure_customer_workspace", { method: "POST", body: "{}" });
+    const profile = await api(`customer_accounts?select=*&user_id=eq.${encodeURIComponent(state.user.id)}`);
+    if (!profile?.length) throw new Error("Không tìm thấy hồ sơ khách hàng của tài khoản này.");
+    state.customerAccount = profile[0]; state.workspace = "customer"; await loadCustomerData(); render();
+  } catch (error) { fail(error); }
+}
+async function switchToAdminWorkspace() {
+  state.workspace = "admin";
+  try { await loadData(); render(); } catch (error) { fail(error); }
 }
 function currentMonthTx() { return state.transactions.filter(t => t.status === "paid" && String(t.transaction_date).slice(0, 7) === new Date().toISOString().slice(0, 7)); }
 function dashboardView() {
@@ -184,6 +225,27 @@ function documentsView() {
   const table = !rows.length ? emptyState("file", "Chưa có chứng từ", "Tải hóa đơn, biên nhận hoặc chứng từ vận chuyển lên máy chủ.", "new-document") : `<div class="table-wrap"><table><thead><tr><th>TÊN TỆP</th><th>ĐƠN HÀNG</th><th>GHI CHÚ</th><th>DUNG LƯỢNG</th><th>NGÀY TẢI</th><th></th></tr></thead><tbody>${rows.map(d => `<tr><td><span class="file-cell"><i class="file-icon">${icon("file", 17)}</i><span><b>${escapeHTML(d.file_name)}</b><small class="subline">${escapeHTML(d.mime_type || "Tệp đính kèm")}</small></span></span></td><td><b>${escapeHTML(d.order?.code || "—")}</b></td><td>${escapeHTML(d.note || "—")}</td><td>${formatSize(d.file_size)}</td><td>${dateText(d.created_at)}</td><td><div class="row-actions"><button class="icon-button" data-action="download-document" data-id="${d.id}" title="Tải xuống">${icon("download", 16)}</button><button class="icon-button danger" data-action="delete-document" data-id="${d.id}" title="Xóa">${icon("trash", 16)}</button></div></td></tr>`).join("")}</tbody></table></div>`;
   return `<div class="document-note">${icon("shield", 18)} Chứng từ được lưu trong kho riêng tư. Chỉ tài khoản quản trị đã được phê duyệt mới có thể xem hoặc tải tệp.</div><section class="panel table-panel">${toolbar("Tìm tên tệp hoặc mã đơn...")}${table}</section>`;
 }
+function activityView() {
+  const rows = state.activity || [];
+  const actionLabel = { INSERT: "Tạo mới", UPDATE: "Cập nhật", DELETE: "Xóa" };
+  const entityLabel = { customers: "Khách hàng", orders: "Đơn hàng", transactions: "Thu chi", order_documents: "Chứng từ", "chứng từ · tệp lưu trữ": "Tệp chứng từ" };
+  const fieldLabel = { name: "Tên", company: "Công ty", phone: "Điện thoại", email: "Email", route: "Tuyến", cargo_description: "Hàng hóa", amount: "Giá trị", expected_cost: "Chi phí dự kiến", status: "Trạng thái", note: "Ghi chú", direction: "Loại thu/chi", category: "Danh mục", transaction_date: "Ngày giao dịch", method: "Phương thức", customer_id: "Khách hàng", order_id: "Đơn hàng", reference: "Mã tham chiếu", file_name: "Tên tệp", storage_path: "Đường dẫn tệp", file_size: "Dung lượng" };
+  const deviceLabel = ua => {
+    if (!ua) return "Không rõ thiết bị";
+    const os = /Windows/i.test(ua) ? "Windows" : /Android/i.test(ua) ? "Android" : /iPhone|iPad/i.test(ua) ? "iOS" : /Mac OS/i.test(ua) ? "macOS" : /Linux/i.test(ua) ? "Linux" : "Thiết bị khác";
+    const browser = /Edg\//i.test(ua) ? "Edge" : /Firefox\//i.test(ua) ? "Firefox" : /Chrome\//i.test(ua) ? "Chrome" : /Safari\//i.test(ua) ? "Safari" : "Trình duyệt khác";
+    const kind = /Mobile|Android|iPhone/i.test(ua) ? "Điện thoại" : /iPad|Tablet/i.test(ua) ? "Máy tính bảng" : "Máy tính";
+    return `${kind} · ${os} · ${browser}`;
+  };
+  const rowsHtml = rows.length ? rows.map(row => {
+    const changes = (row.changed_fields || []).map(key => fieldLabel[key] || key).join(", ") || (row.action === "DELETE" ? "Bản ghi đã xóa" : "Thao tác hệ thống");
+    const actor = row.actor_email || (row.actor_role === "admin" ? "Quản trị viên" : "Tài khoản đã đăng nhập");
+    const actionClass = row.action === "DELETE" ? "deleted" : row.action === "INSERT" ? "created" : "updated";
+    const time = new Intl.DateTimeFormat("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }).format(new Date(row.occurred_at));
+    return `<tr><td><b>${time}</b><small class="subline">UTC+7 · Việt Nam</small></td><td><b>${escapeHTML(actor)}</b><small class="subline">${row.actor_role === "admin" ? "Quản trị viên" : "Khách hàng / tài khoản"}</small></td><td><span class="activity-action ${actionClass}">${actionLabel[row.action] || escapeHTML(row.action)}</span><small class="subline">${escapeHTML(changes)}</small></td><td><b>${escapeHTML(entityLabel[row.entity_type] || row.entity_type)}</b><small class="subline">${escapeHTML(row.record_label || row.record_id || "—")}</small></td><td>${escapeHTML(row.source_ip || "Không nhận được IP")}</td><td>${escapeHTML(deviceLabel(row.user_agent))}</td></tr>`;
+  }).join("") : `<tr><td colspan="6"><div class="empty-compact">Chưa có thay đổi nào được ghi nhận.</div></td></tr>`;
+  return `<div class="activity-note"><span class="activity-live-dot"></span><div><b>Nhật ký đồng bộ trực tiếp</b><span>Ghi nhận trên máy chủ, sắp xếp mới nhất trước. Giờ hiển thị theo Việt Nam (UTC+7).</span></div><button class="btn ghost small" data-action="refresh">${icon("refresh", 15)} Làm mới</button></div><section class="panel table-panel"><div class="table-toolbar"><div class="activity-count">${rows.length} hoạt động gần nhất</div><span class="activity-retention">Theo dõi đơn hàng · khách hàng · thu chi · chứng từ</span></div><div class="table-wrap"><table class="activity-table"><thead><tr><th>THỜI GIAN</th><th>NGƯỜI THAO TÁC</th><th>HÀNH ĐỘNG / TRƯỜNG THAY ĐỔI</th><th>ĐỐI TƯỢNG</th><th>ĐỊA CHỈ IP</th><th>THIẾT BỊ</th></tr></thead><tbody>${rowsHtml}</tbody></table></div></section>`;
+}
 function formatSize(bytes = 0) { if (bytes < 1024) return `${bytes} B`; if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`; return `${(bytes / (1024 * 1024)).toFixed(1)} MB`; }
 function avatar(name = "?") { const colors = ["mint", "peach", "lavender", "sky", "butter"]; const n = Array.from(name).reduce((a, c) => a + c.charCodeAt(0), 0); return `<i class="avatar ${colors[n % colors.length]}">${escapeHTML(name.trim().slice(0, 1).toUpperCase())}</i>`; }
 function statusPill(value, type) {
@@ -206,6 +268,9 @@ function selectInput(name, label, options, value = "", required = false) { retur
 function textareaInput(name, label, value = "", placeholder = "") { return field(label, `<textarea name="${name}" rows="3" placeholder="${escapeHTML(placeholder)}">${escapeHTML(value)}</textarea>`, true); }
 function formShell(kind, id, fields) { return `<form id="record-form" data-kind="${kind}" data-id="${id || ""}"><div class="form-grid">${fields}</div></form>`; }
 function action(actionName, id) {
+  if (actionName === "switch-customer") { switchToCustomerWorkspace(); return; }
+  if (actionName === "switch-admin") { switchToAdminWorkspace(); return; }
+  if (actionName === "new-customer-order") return customerOrderModal();
   if (actionName === "refresh") { loadData().then(render).catch(fail); return; }
   if (actionName === "new-order") return orderModal();
   if (actionName === "edit-order") return orderModal(state.orders.find(o => o.id === id));
@@ -225,6 +290,10 @@ function orderModal(order) {
   const fields = `${textInput("code", "Mã đơn hàng", order?.code || `HND-${new Date().getFullYear()}-${String(state.orders.length + 1).padStart(4, "0")}`, "HND-2026-0001", "text", true)}${selectInput("customer_id", "Khách hàng", customerOptions(order?.customer_id || ""), order?.customer_id || "")}${textInput("route", "Tuyến vận chuyển", order?.route || "", "VD: TP. Hồ Chí Minh → Hà Nội", "text", true)}${textInput("cargo_description", "Mô tả hàng hóa", order?.cargo_description || "", "Tên hàng, số kiện, khối lượng...")}${textInput("amount", "Giá trị đơn (VND)", order?.amount || "", "0", "number", true)}${textInput("expected_cost", "Chi phí dự kiến (VND)", order?.expected_cost || "", "0", "number")}${selectInput("status", "Trạng thái", [["new", "Mới tiếp nhận"], ["in_progress", "Đang vận chuyển"], ["completed", "Hoàn tất"], ["cancelled", "Đã hủy"]].map(([v, t]) => `<option value="${v}" ${order?.status === v ? "selected" : ""}>${t}</option>`).join(""), order?.status || "new")}${textareaInput("note", "Ghi chú", order?.note || "", "Thông tin thêm về đơn hàng")}`;
   openModal(order ? "Cập nhật đơn hàng" : "Tạo đơn hàng mới", formShell("order", order?.id, fields), order ? "Lưu thay đổi" : "Tạo đơn hàng");
 }
+function customerOrderModal() {
+  const fields = `${textInput("route", "Tuyến vận chuyển", "", "VD: TP. Hồ Chí Minh → Hà Nội", "text", true)}${textInput("cargo_description", "Mô tả hàng hóa", "", "Tên hàng, số kiện, khối lượng...")}${textareaInput("note", "Yêu cầu xử lý", "", "Thời gian, lưu ý nhận hàng hoặc yêu cầu khác")}`;
+  openModal("Gửi yêu cầu đơn hàng", formShell("customer-order", "", fields), "Gửi yêu cầu");
+}
 function customerModal(customer) {
   const fields = `${textInput("name", "Tên khách hàng", customer?.name || "", "Họ tên hoặc tên doanh nghiệp", "text", true)}${textInput("company", "Tên công ty", customer?.company || "", "Tên doanh nghiệp")}${textInput("phone", "Số điện thoại", customer?.phone || "", "090...", "tel")}${textInput("email", "Email", customer?.email || "", "email@company.vn", "email")}${textareaInput("note", "Ghi chú", customer?.note || "", "Địa chỉ, mã số thuế...")}`;
   openModal(customer ? "Cập nhật khách hàng" : "Thêm khách hàng", formShell("customer", customer?.id, fields), customer ? "Lưu thay đổi" : "Thêm khách hàng");
@@ -241,15 +310,22 @@ async function handleRecordSubmit(e) {
   e.preventDefault(); const form = e.currentTarget; const data = new FormData(form); const kind = form.dataset.kind; const id = form.dataset.id; const button = document.querySelector(".modal-foot [type=submit]"); button.disabled = true; button.innerHTML = '<span class="spinner"></span> Đang lưu';
   try {
     if (kind === "document") await uploadDocument(data);
+    else if (kind === "customer-order") {
+      await api("rpc/submit_customer_order", { method: "POST", body: JSON.stringify({ p_route: String(data.get("route") || "").trim(), p_cargo_description: String(data.get("cargo_description") || "").trim() || null, p_note: String(data.get("note") || "").trim() || null }) });
+    } else if (kind === "customer-profile") {
+      const profile = Object.fromEntries(data.entries());
+      await api(`customer_accounts?user_id=eq.${encodeURIComponent(state.user.id)}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify(profile) });
+    }
     else {
       const record = Object.fromEntries(data.entries());
       if (kind === "order") { record.customer_id = record.customer_id || null; record.amount = Number(record.amount); record.expected_cost = Number(record.expected_cost || 0); }
       if (kind === "customer") { record.email = record.email || null; record.phone = record.phone || null; }
       if (kind === "transaction") { record.customer_id = record.customer_id || null; record.order_id = record.order_id || null; record.amount = Number(record.amount); }
+      if (kind === "order") record.customer_user_id = record.customer_id ? (state.customerAccounts.find(a => a.customer_id === record.customer_id)?.user_id || null) : null;
       if (id) await api(`${kind === "order" ? "orders" : kind === "customer" ? "customers" : "transactions"}?id=eq.${id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify(record) });
       else await api(kind === "order" ? "orders" : kind === "customer" ? "customers" : "transactions", { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify(record) });
     }
-    closeModal(); await loadData(); render(); showToast("Đã lưu và đồng bộ dữ liệu.");
+    closeModal(); if (state.workspace === "customer") await loadCustomerData(); else await loadData(); render(); showToast("Đã lưu và đồng bộ dữ liệu.");
   } catch (error) { fail(error); button.disabled = false; button.innerHTML = "Thử lại"; }
 }
 async function uploadDocument(form) {
@@ -269,7 +345,7 @@ async function downloadDocument(id) {
 }
 async function deleteDocument(id) {
   const doc = state.documents.find(d => d.id === id); if (!doc || !confirm(`Xóa chứng từ “${doc.file_name}”?`)) return;
-  try { await request(`/storage/v1/object/${BUCKET}`, { method: "DELETE", body: JSON.stringify({ prefixes: [doc.storage_path] }) }); await api(`order_documents?id=eq.${id}`, { method: "DELETE" }); await loadData(); render(); showToast("Đã xóa chứng từ."); } catch (error) { fail(error); }
+  try { await request(`/storage/v1/object/${BUCKET}`, { method: "DELETE", body: JSON.stringify({ prefixes: [doc.storage_path] }) }); await api(`order_documents?id=eq.${id}`, { method: "DELETE" }); if (state.workspace === "customer") await loadCustomerData(); else await loadData(); render(); showToast("Đã xóa chứng từ."); } catch (error) { fail(error); }
 }
 async function confirmDelete(label, id, table) {
   if (!confirm(`Bạn có chắc muốn xóa ${label} này? Hành động này không thể hoàn tác.`)) return;
@@ -278,13 +354,29 @@ async function confirmDelete(label, id, table) {
 
 async function loadData() {
   if (!state.session) return;
-  const [customers, orders, transactions, documents] = await Promise.all([
+  const [customers, orders, transactions, documents, activity, customerAccounts] = await Promise.all([
     api("customers?select=*&order=created_at.desc"),
     api("orders?select=*,customer:customers(name)&order=created_at.desc"),
     api("transactions?select=*,customer:customers(name),order:orders(code)&order=transaction_date.desc,created_at.desc"),
-    api("order_documents?select=*,order:orders(code)&order=created_at.desc")
+    api("order_documents?select=*,order:orders(code)&order=created_at.desc"),
+    api("activity_log?select=*&order=occurred_at.desc&limit=200"),
+    api("customer_accounts?select=user_id,customer_id,full_name&order=created_at.desc")
   ]);
-  state.customers = customers || []; state.orders = orders || []; state.transactions = transactions || []; state.documents = documents || [];
+  state.customers = customers || []; state.orders = orders || []; state.transactions = transactions || []; state.documents = documents || []; state.activity = activity || []; state.customerAccounts = customerAccounts || [];
+}
+function startRealtime() {
+  if (state.realtime || !window.supabase?.createClient || !state.session?.access_token) return;
+  const client = window.supabase.createClient(DB_URL, PUBLIC_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+    accessToken: async () => state.session?.access_token || PUBLIC_KEY
+  });
+  state.realtimeStatus = "CONNECTING";
+  state.realtime = client.channel("hunda-admin-activity")
+    .on("postgres_changes", { event: "INSERT", schema: "public", table: "activity_log" }, async () => {
+      if (!state.session || document.hidden) return;
+      try { await loadData(); if (document.querySelector(".app-shell")) render(); } catch { /* Periodic refresh remains available if realtime temporarily disconnects. */ }
+    })
+    .subscribe(status => { state.realtimeStatus = status; if (state.page === "activity" && state.workspace === "admin") render(); });
 }
 async function checkAdmin() {
   try { const rows = await api(`admin_users?select=user_id&user_id=eq.${encodeURIComponent(state.user.id)}&active=eq.true`); return rows.length > 0; }
@@ -293,13 +385,12 @@ async function checkAdmin() {
 async function authRequest(route, body) { return request(`/auth/v1/${route}`, { method: "POST", body: JSON.stringify(body) }, false); }
 async function signIn(email, password) {
   const session = await authRequest("token?grant_type=password", { email, password }); saveSession(session); state.user = session.user || null;
-  const ok = await checkAdmin(); if (!ok) return renderPending(state.user?.email);
   await enterApp();
 }
 async function signUp(email, password, profile) {
   const result = await authRequest("signup", { email, password, data: profile });
-  if (result.access_token) { saveSession(result); state.user = result.user || null; renderPending(state.user?.email); }
-  else authShell("login", "Tài khoản đã được tạo. Hãy xác nhận email nếu hệ thống yêu cầu, sau đó đăng nhập. Quản trị viên sẽ cấp quyền truy cập.");
+  if (result.access_token) { saveSession(result); state.user = result.user || null; await enterApp(); }
+  else authShell("login", "Tài khoản khách hàng đã được tạo. Hãy xác nhận email nếu hệ thống yêu cầu, sau đó đăng nhập để gửi và theo dõi yêu cầu đơn hàng.");
 }
 async function sendPasswordReset(email) {
   const redirectTo = `${location.origin}${location.pathname}`;
@@ -311,13 +402,19 @@ async function updatePassword(password) {
   authShell("login", "Mật khẩu đã được cập nhật. Hãy đăng nhập bằng mật khẩu mới.");
 }
 async function signOut() {
+  if (state.realtime) { try { await state.realtime.unsubscribe(); } catch {} state.realtime = null; }
   try { if (state.session?.access_token) await request("/auth/v1/logout", { method: "POST" }); } catch { /* Local sign-out still completes when the server session expired. */ }
-  saveSession(null); state.user = null; state.customers = []; state.orders = []; state.transactions = []; state.documents = []; authShell("login");
+  saveSession(null); state.user = null; state.workspace = "admin"; state.isAdmin = false; state.customerAccount = null; state.customerAccounts = []; state.customers = []; state.orders = []; state.customerOrders = []; state.transactions = []; state.documents = []; state.activity = []; authShell("login");
 }
 async function enterApp() {
-  if (!(await checkAdmin())) return renderPending(state.user?.email);
   root.innerHTML = `<main class="loading-screen"><span class="loader"></span><p>Đang đồng bộ Hunda Logistics...</p></main>`;
-  try { await loadData(); render(); } catch (error) { fail(error); authShell("login", `Không tải được dữ liệu: ${error.message}`); }
+  try {
+    state.isAdmin = await checkAdmin();
+    if (state.isAdmin) { state.workspace = "admin"; await loadData(); render(); startRealtime(); return; }
+    const profile = await api(`customer_accounts?select=*&user_id=eq.${encodeURIComponent(state.user.id)}`);
+    if (!profile?.length) return renderPending(state.user?.email);
+    state.customerAccount = profile[0]; state.workspace = "customer"; await loadCustomerData(); render(); startRealtime();
+  } catch (error) { fail(error); authShell("login", `Không tải được dữ liệu: ${error.message}`); }
 }
 function bindAuth() {
   document.querySelectorAll("[data-auth-view]").forEach(b => b.addEventListener("click", () => authShell(b.dataset.authView)));
@@ -351,5 +448,6 @@ function bootstrap() {
 document.addEventListener("click", e => { const btn = e.target.closest("[data-action]"); if (btn) action(btn.dataset.action, btn.dataset.id); });
 window.addEventListener("storage", e => { if (e.key === SESSION_KEY) location.reload(); });
 document.addEventListener("visibilitychange", () => { if (!document.hidden && state.session) loadData().then(render).catch(() => {}); });
-setInterval(() => { if (!document.hidden && state.session) loadData().then(() => { if (document.querySelector(".app-shell")) render(); }).catch(() => {}); }, 45000);
+setInterval(() => { if (!document.hidden && state.session && state.workspace === "customer") loadCustomerData().then(() => { if (document.querySelector(".app-shell")) render(); }).catch(() => {}); }, 8000);
+setInterval(() => { if (!document.hidden && state.session && state.workspace === "admin") loadData().then(() => { if (document.querySelector(".app-shell")) render(); }).catch(() => {}); }, 45000);
 bootstrap();
