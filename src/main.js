@@ -505,7 +505,7 @@ function documentModal(document, orderId = "") {
   openModal("Tải chứng từ lên máy chủ", formShell("document", "", fields), "Tải lên");
 }
 async function handleRecordSubmit(e) {
-  e.preventDefault(); const form = e.currentTarget; const data = new FormData(form); const kind = form.dataset.kind; const id = form.dataset.id; let walletPayment = null; const button = document.querySelector(".modal-foot [type=submit]"); button.disabled = true; button.innerHTML = '<span class="spinner"></span> Đang lưu';
+  e.preventDefault(); if (e.currentTarget.dataset.kind === "wallet-payment") { closeModal(); return; } const form = e.currentTarget; const data = new FormData(form); const kind = form.dataset.kind; const id = form.dataset.id; let walletPayment = null; const button = document.querySelector(".modal-foot [type=submit]"); button.disabled = true; button.innerHTML = '<span class="spinner"></span> Đang lưu';
   try {
     if (kind === "wallet-settings") {
       const result = await walletRequest({ action: "admin-settings", settings: { bank_name: String(data.get("bank_name") || "").trim(), bank_code: String(data.get("bank_code") || "").trim(), bank_account: String(data.get("bank_account") || "").trim(), bank_holder: String(data.get("bank_holder") || "").trim(), transfer_note: String(data.get("transfer_note") || "HUNDA").trim() } });
@@ -513,6 +513,7 @@ async function handleRecordSubmit(e) {
     } else if (kind === "wallet-deposit" || kind === "wallet-withdrawal") {
       const result = await walletRequest({ action: "request", transaction_type: kind === "wallet-deposit" ? "deposit" : "withdrawal", amount: Number(data.get("amount")), bank_name: String(data.get("bank_name") || "").trim(), bank_account: String(data.get("bank_account") || "").trim(), bank_holder: String(data.get("bank_holder") || "").trim(), note: kind === "wallet-deposit" ? `${state.wallet?.bank?.transfer_note || "HUNDA"}-${String(state.user?.id || "").slice(0, 8).toUpperCase()}` : "" });
       if (!result?.transaction_id) throw new Error("Máy chủ chưa tiếp nhận yêu cầu.");
+      if (kind === "wallet-deposit") { if (!result.qr_url || !result.transfer_code) throw new Error("Chưa thể tạo QR. Hãy kiểm tra mã ngân hàng VietQR trong cấu hình nhận tiền."); walletPayment = result; }
     } else if (kind === "managed-account") {
       const result = await accountAdminRequest({ action: "create", account: { role: String(data.get("role")), full_name: String(data.get("full_name") || "").trim(), email: String(data.get("email") || "").trim(), phone: String(data.get("phone") || "").trim(), company: String(data.get("company") || "").trim(), password: String(data.get("password") || "") } });
       if (!result?.account?.user_id) throw new Error("Máy chủ chưa xác nhận tài khoản mới.");
