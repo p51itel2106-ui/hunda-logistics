@@ -416,6 +416,11 @@ function customerOrderModal(quoteId = "") {
   const fields = `${selectInput("quote_id", "Báo giá đã được duyệt", quoteOptions, selectedQuoteId, true)}${quoteNotice}${textInput("route", "Tuyến vận chuyển", "", "VD: TP. Hồ Chí Minh → Hà Nội", "text", true)}${textInput("cargo_description", "Mô tả hàng hóa", "", "Tên hàng, số kiện, khối lượng...")}${textareaInput("note", "Yêu cầu xử lý", "", "Thời gian, lưu ý nhận hàng hoặc yêu cầu khác")}`;
   openModal("Gửi yêu cầu đơn hàng", formShell("customer-order", "", fields), "Gửi yêu cầu");
 }
+function managedAccountModal() {
+  const roles = `<option value="customer" selected>Khách hàng — chỉ xem hồ sơ và đơn hàng của mình</option><option value="admin">Quản trị viên — quản lý toàn bộ hệ thống</option>`;
+  const fields = `${selectInput("role", "Vai trò truy cập", roles, "customer", true)}${textInput("full_name", "Họ và tên", "", "Nguyễn Văn An", "text", true)}${textInput("email", "Email đăng nhập", "", "email@congty.vn", "email", true)}${textInput("phone", "Số điện thoại", "", "09xx xxx xxx", "tel")}${textInput("company", "Tên công ty", "", "Tên doanh nghiệp")}${textInput("password", "Mật khẩu khởi tạo", "", "Tối thiểu 8 ký tự", "password", true)}${field("Phân quyền", `<p class="form-hint">Quản trị viên được quản lý toàn bộ dữ liệu vận hành. Khách hàng chỉ truy cập hồ sơ và đơn hàng của mình.</p>`, true)}`;
+  openModal("Cấp tài khoản truy cập", formShell("managed-account", "", fields), "Tạo tài khoản");
+}
 function customerModal(customer) {
   const fields = `${textInput("name", "Tên khách hàng", customer?.name || "", "Họ tên hoặc tên doanh nghiệp", "text", true)}${textInput("company", "Tên công ty", customer?.company || "", "Tên doanh nghiệp")}${textInput("phone", "Số điện thoại", customer?.phone || "", "090...", "tel")}${textInput("email", "Email", customer?.email || "", "email@company.vn", "email")}${textareaInput("note", "Ghi chú", customer?.note || "", "Địa chỉ, mã số thuế...")}`;
   openModal(customer ? "Cập nhật khách hàng" : "Thêm khách hàng", formShell("customer", customer?.id, fields), customer ? "Lưu thay đổi" : "Thêm khách hàng");
