@@ -50,17 +50,20 @@ Deno.serve(async (req: Request) => {
 
     const body = await req.json();
     if (body?.action === "list") {
-      const [{ data: adminRows, error: adminError }, { data: profileRows, error: profileError }, { data: usersResult, error: usersError }] = await Promise.all([
+      const [{ data: adminRows, error: adminError }, { data: profileRows, error: profileError }, { data: walletRows, error: walletError }, { data: usersResult, error: usersError }] = await Promise.all([
         adminClient.from("admin_users").select("user_id,email,active,created_at"),
         adminClient.from("customer_accounts").select("user_id,customer_id,full_name,phone,billing_company,created_at"),
+        adminClient.from("user_wallets").select("user_id,balance"),
         adminClient.auth.admin.listUsers({ page: 1, perPage: 1000 }),
       ]);
       if (adminError) throw adminError;
       if (profileError) throw profileError;
+      if (walletError) throw walletError;
       if (usersError) throw usersError;
 
       const admins = new Map((adminRows || []).map((row) => [row.user_id, row]));
       const profiles = new Map((profileRows || []).map((row) => [row.user_id, row]));
+      const wallets = new Map((walletRows || []).map((row) => [row.user_id, row]));
       const accounts = (usersResult?.users || [])
         .filter((authUser) => admins.has(authUser.id) || profiles.has(authUser.id))
         .map((authUser) => {
@@ -73,6 +76,7 @@ Deno.serve(async (req: Request) => {
             phone: profile?.phone || authUser.user_metadata?.phone || "",
             company: profile?.billing_company || authUser.user_metadata?.billing_company || "",
             role: admin ? "admin" : "customer",
+            balance: Number(wallets.get(authUser.id)?.balance || 0),
             active: admin ? admin.active && !authUser.banned_until : !authUser.banned_until,
             email_confirmed: Boolean(authUser.email_confirmed_at),
             created_at: authUser.created_at,
