@@ -230,3 +230,17 @@ body{background:var(--canvas)}
 }
 
 .quote-order-note{margin:0;color:#72817a;font-size:12px;line-height:1.55}
+
+
+/* Approved quotes continue directly into the customer order progress flow. */
+.approved-quotes-flow{scroll-margin-top:22px}
+.approved-quote-list{display:grid;gap:10px}
+.approved-quote-card{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 16px;border:1px solid #e8ece9;border-radius:9px;background:#fbfcfa}
+.approved-quote-summary{display:grid;justify-items:start;gap:6px;min-width:0}
+.approved-quote-summary>b{font-size:12px;color:#172b3d}
+.approved-quote-summary>small{font-size:10px;color:#72817a;line-height:1.5}
+.quote-order-linked{font-size:11px;color:#398252;font-weight:700}
+@media(max-width:600px){
+ .approved-quote-card{align-items:stretch;flex-direction:column}
+ .approved-quote-card .btn{width:100%;justify-content:center}
+}
