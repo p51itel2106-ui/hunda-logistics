@@ -228,3 +228,5 @@ body{background:var(--canvas)}
  .quote-submit-row{align-items:flex-start;flex-direction:column}
  .quote-submit-row .btn{width:100%;justify-content:center}
 }
+
+.quote-order-note{margin:0;color:#72817a;font-size:12px;line-height:1.55}
