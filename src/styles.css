@@ -149,3 +149,20 @@ body{background:var(--canvas)}
  .auth-brand-copy>b{font-size:21px}
  .auth-brand-copy>small{font-size:8px;letter-spacing:1.6px}
 }
+
+/* Use only the photographic lower section of the existing logistics banner. */
+.auth-left{
+  background:
+    linear-gradient(90deg,rgba(7,25,40,.76),rgba(8,34,53,.5)),
+    linear-gradient(0deg,rgba(7,25,40,.48),rgba(7,25,40,.16)),
+    url('/assets/hunda-logistics-banner.jpg') center bottom/auto 245% no-repeat;
+}
+.auth-copy{max-width:620px}
+.auth-copy h1{font-size:clamp(34px,3.1vw,48px);letter-spacing:-1.3px;line-height:1.15}
+.auth-brand{display:none}
+.auth-content-wrap{padding-top:35px}
+@media(max-width:850px){
+ .auth-left{background-size:auto 245%;background-position:center bottom}
+ .auth-copy h1{font-size:clamp(34px,6vw,46px)}
+ .auth-content-wrap{padding-top:0}
+}
