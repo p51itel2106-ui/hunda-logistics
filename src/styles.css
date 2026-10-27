@@ -355,3 +355,12 @@ body{background:var(--canvas)}
  .customer-order-management .table-wrap table{min-width:760px}
  .customer-order-history-list{padding-right:14px;padding-left:14px}
 }
+
+
+.wallet-history-tabs{display:flex;gap:8px;margin:18px 0 12px;padding:5px;border:1px solid #e8ede9;border-radius:12px;background:#f6f8f6;width:max-content}
+.wallet-history-tabs [role="tab"]{display:inline-flex;align-items:center;gap:8px;min-height:38px;padding:0 16px;border:0;border-radius:9px;background:transparent;color:#617069;font:700 12px Manrope,sans-serif;cursor:pointer;transition:background .18s,color .18s,box-shadow .18s}
+.wallet-history-tabs [role="tab"]:hover{color:#173b2e;background:#edf3ef}
+.wallet-history-tabs [role="tab"].active{background:#fff;color:#e86e0b;box-shadow:0 2px 7px #18352812}
+.wallet-history-tabs [role="tab"]>span{display:grid;min-width:18px;height:18px;place-items:center;padding:0 4px;border-radius:999px;background:#fff0e2;color:#db650b;font-size:10px}
+.wallet-history-tabs+[class~="panel"]{margin-top:0}
+@media(max-width:600px){.wallet-history-tabs{width:100%}.wallet-history-tabs [role="tab"]{flex:1;justify-content:center}}
