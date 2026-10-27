@@ -9,6 +9,18 @@ create unique index if not exists wallet_transactions_order_payment_unique on pu
 alter table public.transactions add column if not exists source_type text not null default 'manual', add column if not exists wallet_transaction_id uuid references public.wallet_transactions(id) on delete set null;
 do $$ begin if not exists(select 1 from pg_constraint where conname='transactions_source_type_check' and conrelid='public.transactions'::regclass) then alter table public.transactions add constraint transactions_source_type_check check(source_type in ('manual','customer_withdrawal','admin_withdrawal')); end if; end $$;
 create unique index if not exists transactions_wallet_transaction_unique on public.transactions(wallet_transaction_id) where wallet_transaction_id is not null;
+-- Backfill finance expenses for withdrawals approved before this change.
+insert into public.transactions(direction,category,amount,transaction_date,status,method,customer_id,reference,note,created_by,source_type,wallet_transaction_id)
+select 'expense','Khách hàng rút tiền',wt.amount,
+       coalesce((wt.decided_at at time zone 'Asia/Ho_Chi_Minh')::date,wt.created_at::date),
+       'paid','Chuyển khoản',ca.customer_id,wt.id::text,
+       coalesce(nullif(trim(wt.admin_note),''),wt.note,'Rút từ ví khách hàng'),
+       wt.decided_by,'customer_withdrawal',wt.id
+from public.wallet_transactions wt
+left join public.customer_accounts ca on ca.user_id=wt.user_id
+where wt.transaction_type='withdrawal' and wt.status='approved'
+  and not exists(select 1 from public.transactions t where t.wallet_transaction_id=wt.id);
+
 create or replace function public.hunda_review_wallet_transaction(p_transaction_id uuid,p_approve boolean,p_admin_id uuid,p_review_note text default null)
 returns void language plpgsql security definer set search_path='' as $$
 declare transaction_row public.wallet_transactions%rowtype; customer_key uuid;
