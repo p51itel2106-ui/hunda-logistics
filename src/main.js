@@ -191,6 +191,33 @@ function customerWorkspaceView() {
   }));
   bindCustomerQuoteForm();
 }
+async function loadQuoteImageUrls(quotes) {
+  const entries = await Promise.all((quotes || []).filter(q => q.product_image_path).map(async q => {
+    try {
+      const result = await request("/storage/v1/object/sign/" + BUCKET + "/" + q.product_image_path.split("/").map(encodeURIComponent).join("/"), { method: "POST", body: JSON.stringify({ expiresIn: 3600 }) });
+      const url = result.signedURL.startsWith("http") ? result.signedURL : DB_URL + "/storage/v1" + (result.signedURL.startsWith("/") ? "" : "/") + result.signedURL;
+      return [q.id, url];
+    } catch { return null; }
+  }));
+  state.quoteImageUrls = Object.fromEntries(entries.filter(Boolean));
+}
+async function loadCustomerData() {
+  if (!state.session) return;
+  const [orders, documents, quotes] = await Promise.all([
+    api("rpc/get_customer_orders", { method: "POST", body: "{}" }),
+    api("order_documents?select=*&order=created_at.desc"),
+    api("customer_quotes?select=*&order=created_at.desc")
+  ]);
+  state.customerOrders = orders || [];
+  state.orders = state.customerOrders;
+  state.documents = documents || [];
+  state.quotes = quotes || [];
+  await loadQuoteImageUrls(state.quotes);
+}
+async function switchToAdminWorkspace() {
+  state.workspace = "admin";
+  try { await loadData(); render(); } catch (error) { fail(error); }
+}
 function currentMonthTx() { return state.transactions.filter(t => t.status === "paid" && String(t.transaction_date).slice(0, 7) === new Date().toISOString().slice(0, 7)); }
 function dashboardView() {
   const tx = currentMonthTx(); const income = tx.filter(t => t.direction === "income").reduce((n, t) => n + Number(t.amount), 0); const expense = tx.filter(t => t.direction === "expense").reduce((n, t) => n + Number(t.amount), 0); const open = state.orders.filter(o => !["completed", "cancelled"].includes(o.status));
