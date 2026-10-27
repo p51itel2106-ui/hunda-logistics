@@ -323,3 +323,10 @@ body{background:var(--canvas)}
  .customer-app .customer-wallet-topbar .btn{min-height:32px;padding:0 8px}
  .wallet-payment-card{max-height:calc(100dvh - 24px);overflow:auto}
 }
+
+.wallet-payment-modal{width:min(520px,100%);max-height:calc(100dvh - 32px)}
+.wallet-payment-modal .modal-body{display:flex;justify-content:center}
+.wallet-payment-modal #record-form{width:min(360px,100%)}
+.wallet-payment-modal .form-grid{display:block}
+.wallet-payment-modal .wallet-payment{width:100%}
+@media(max-width:480px){.wallet-payment-modal{max-height:calc(100dvh - 24px)}}
