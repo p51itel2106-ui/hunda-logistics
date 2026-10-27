@@ -364,3 +364,16 @@ body{background:var(--canvas)}
 .wallet-history-tabs [role="tab"]>span{display:grid;min-width:18px;height:18px;place-items:center;padding:0 4px;border-radius:999px;background:#fff0e2;color:#db650b;font-size:10px}
 .wallet-history-tabs+[class~="panel"]{margin-top:0}
 @media(max-width:600px){.wallet-history-tabs{width:100%}.wallet-history-tabs [role="tab"]{flex:1;justify-content:center}}
+
+
+.wallet-payment-status{display:flex;align-items:center;justify-content:center;gap:9px;margin:2px 0;padding:12px 14px;border:1px solid #f2dfbe;border-radius:10px;background:#fff9ed;color:#8c5b12;font-size:11px;line-height:1.5;text-align:center}
+.wallet-payment-status .spinner{flex:none}
+.wallet-payment-status.unconfirmed{border-color:#f0d6c9;background:#fff6f2;color:#a34d2c}
+.wallet-payment-result{display:grid;justify-items:center;gap:10px;padding:14px 8px 18px;text-align:center}
+.wallet-payment-result-icon{display:grid;width:64px;height:64px;place-items:center;border-radius:50%;background:#e8f6ed;color:#16824a}
+.wallet-payment-result.rejected .wallet-payment-result-icon{background:#fff0ec;color:#c14334}
+.wallet-payment-result h3{margin:2px 0 0;color:#173c2c;font:800 21px Manrope,sans-serif}
+.wallet-payment-result.rejected h3{color:#a9342b}
+.wallet-payment-result p{max-width:340px;margin:0;color:#68766e;font-size:12px;line-height:1.6}
+.wallet-payment-result>strong{color:#176b4b;font:800 24px Manrope,sans-serif}
+.wallet-payment-result>small{color:#7b8880;font-size:10px}

@@ -6,6 +6,8 @@ const BUCKET = "hunda-documents";
 const SESSION_KEY = "hunda-auth-session";
 const state = { page: "dashboard", workspace: "admin", isAdmin: false, customerAccount: null, customerAccounts: [], managedAccounts: [], wallet: null, walletAdmin: null, walletAdminTab: "deposit", session: readSession(), user: null, customers: [], orders: [], customerOrders: [], transactions: [], transactionFilter: "all", documents: [], quotes: [], quoteImageUrls: {}, quoteDraft: { actual: "0", cbm: "0", convert: false, marketplace: "taobao", productUrl: "", productSku: "", productQuantity: "1", productNote: "", dirty: false }, activity: [], customerPage: "management", search: "", month: new Date().toISOString().slice(0, 7), realtime: null };
 
+const walletPaymentTimers = new Map();
+
 const icons = {
   grid: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
   box: '<path d="m3 7 9-4 9 4-9 4-9-4Z"/><path d="M3 7v10l9 4 9-4V7M12 11v10"/>',
@@ -547,13 +549,65 @@ function customerOrderModal(quoteId = "") {
 }
 function walletPaymentModal(payment) {
   const bank = payment.bank || state.wallet?.bank || {};
-  const fields = "<div class=\"wallet-payment\"><div class=\"wallet-payment-amount\">" + money(payment.amount || 0) + "</div><p>Mở ứng dụng ngân hàng và quét mã QR để chuyển khoản.</p><img class=\"wallet-payment-qr\" src=\"" + escapeHTML(payment.qr_url) + "\" alt=\"Mã QR chuyển khoản SePay\" /><div class=\"wallet-bank-info\"><b>" + escapeHTML(bank.bank_name || "Tài khoản nhận tiền") + "</b><span>Chủ tài khoản: " + escapeHTML(bank.bank_holder || "") + "</span><strong>" + escapeHTML(bank.bank_account || "") + "</strong><div class=\"wallet-payment-code\"><span>Nội dung chuyển khoản</span><b>" + escapeHTML(payment.transfer_code) + "</b><button type=\"button\" class=\"btn ghost small\" data-copy-transfer>" + icon("file", 14) + " Sao chép</button></div></div><p class=\"form-hint\">Số dư tự cập nhật sau khi SePay xác nhận tiền đã vào tài khoản.</p></div>";
-  openModal("Quét mã để nạp tiền", formShell("wallet-payment", "", fields), "Đã hiểu");
+  const fields = '<div class="wallet-payment" data-wallet-payment-id="' + escapeHTML(payment.transaction_id || "") + '"><div class="wallet-payment-amount">' + money(payment.amount || 0) + '</div><p>Mở ứng dụng ngân hàng và quét mã QR để chuyển khoản.</p><img class="wallet-payment-qr" src="' + escapeHTML(payment.qr_url) + '" alt="Mã QR chuyển khoản SePay" /><div class="wallet-bank-info"><b>' + escapeHTML(bank.bank_name || "Tài khoản nhận tiền") + '</b><span>Chủ tài khoản: ' + escapeHTML(bank.bank_holder || "") + '</span><strong>' + escapeHTML(bank.bank_account || "") + '</strong><div class="wallet-payment-code"><span>Nội dung chuyển khoản</span><b>' + escapeHTML(payment.transfer_code) + '</b><button type="button" class="btn ghost small" data-copy-transfer>' + icon("file", 14) + ' Sao chép</button></div></div><div class="wallet-payment-status pending" data-wallet-payment-status><span class="spinner"></span><span>Đang chờ SePay xác nhận khoản tiền đã vào tài khoản...</span></div><p class="form-hint">Số dư chỉ cập nhật sau khi máy chủ nhận xác nhận thanh toán từ SePay.</p></div>';
+  openModal("Quét mã để nạp tiền", formShell("wallet-payment", payment.transaction_id || "", fields), "Đã hiểu");
   document.querySelector("[data-copy-transfer]")?.addEventListener("click", async () => {
     try { await navigator.clipboard.writeText(payment.transfer_code); showToast("Đã sao chép nội dung chuyển khoản."); }
     catch { showToast("Không thể sao chép tự động. Hãy chọn và sao chép mã.", "error"); }
   });
+  watchWalletPayment(payment);
 }
+function walletPaymentResultModal(payment, transaction) {
+  const success = transaction.status === "approved";
+  const providerMessage = transaction.payment_provider === "sepay"
+    ? "SePay đã xác nhận khoản chuyển và số dư ví đã được cập nhật."
+    : "Khoản nạp đã được xác nhận và số dư ví đã được cập nhật.";
+  const fields = '<div class="wallet-payment-result ' + (success ? "success" : "rejected") + '"><div class="wallet-payment-result-icon">' + icon(success ? "check" : "close", 28) + '</div><h3>' + (success ? "Giao dịch thành công" : "Yêu cầu nạp tiền bị từ chối") + '</h3><p>' + (success ? providerMessage : escapeHTML(transaction.admin_note || "Yêu cầu nạp tiền chưa được xác nhận. Vui lòng liên hệ Hunda.")) + '</p><strong>' + money(payment.amount || transaction.amount || 0) + '</strong><small>Mã giao dịch: ' + escapeHTML(payment.transfer_code || transaction.transfer_code || "") + '</small></div>';
+  openModal(success ? "Nạp tiền thành công" : "Trạng thái nạp tiền", formShell("wallet-payment", payment.transaction_id || "", fields), "Hoàn tất");
+}
+async function watchWalletPayment(payment) {
+  const transactionId = String(payment.transaction_id || "");
+  if (!transactionId) return;
+  const existing = walletPaymentTimers.get(transactionId);
+  if (existing) clearInterval(existing);
+  let checking = false;
+  const startedAt = Date.now();
+  let timer;
+  const checkStatus = async () => {
+    if (checking) return;
+    checking = true;
+    try {
+      const snapshot = await walletRequest({ action: "snapshot" });
+      state.wallet = snapshot;
+      const transaction = (snapshot.transactions || []).find(item => item.id === transactionId);
+      if (transaction && ["approved", "rejected"].includes(transaction.status)) {
+        clearInterval(timer);
+        walletPaymentTimers.delete(transactionId);
+        const activePayment = document.querySelector('.wallet-payment[data-wallet-payment-id="' + transactionId + '"]');
+        if (activePayment) walletPaymentResultModal(payment, transaction);
+        else {
+          showToast(transaction.status === "approved" ? "Giao dịch nạp tiền đã thành công." : "Yêu cầu nạp tiền đã bị từ chối.", transaction.status === "approved" ? "success" : "error");
+          if (!document.querySelector(".modal-backdrop") && state.workspace === "customer") render();
+        }
+        return;
+      }
+      if (Date.now() - startedAt > 15 * 60 * 1000) {
+        clearInterval(timer);
+        walletPaymentTimers.delete(transactionId);
+        const status = document.querySelector('.wallet-payment[data-wallet-payment-id="' + transactionId + '"] [data-wallet-payment-status]');
+        if (status) {
+          status.classList.add("unconfirmed");
+          status.innerHTML = "Chưa nhận được xác nhận từ SePay. Nếu bạn đã chuyển khoản, hãy giữ biên nhận và làm mới để kiểm tra lại.";
+        }
+      }
+    } catch { /* Keep checking; only a server-confirmed status can produce a success state. */ }
+    finally { checking = false; }
+  };
+  timer = setInterval(checkStatus, 4000);
+  walletPaymentTimers.set(transactionId, timer);
+  await checkStatus();
+}
+
 function walletTransactionModal(type) {
   const deposit = type === "deposit";
   const bank = state.wallet?.bank || {};
@@ -563,7 +617,7 @@ function walletTransactionModal(type) {
   const fields = deposit
     ? `${field("Chuyển khoản đến", bankDetails, true)}${textInput("amount", "Số tiền nạp (VND) *", "", "Ví dụ: 500000", "number", true)}${field("Thanh toán tự động", `<p class="form-hint">Sau khi tiếp tục, mã QR sẽ điền sẵn số tiền và nội dung riêng. Số dư tự cập nhật khi SePay xác nhận tiền đã vào tài khoản.</p>`, true)}`
     : `${field("Số dư khả dụng", `<p class="wallet-available">${money(state.wallet?.balance || 0)}</p>`)}${field("Số tiền rút (VND) *", `<input name="amount" type="number" min="100000" step="1000" placeholder="Tối thiểu 100.000đ" required />`)}${textInput("bank_name", "Ngân hàng nhận *", "", "Tên ngân hàng", "text", true)}${textInput("bank_account", "Số tài khoản nhận *", "", "Số tài khoản", "text", true)}${textInput("bank_holder", "Chủ tài khoản nhận *", "", "Họ tên chủ tài khoản", "text", true)}${field("Lưu ý", `<p class="form-hint">Mỗi lần rút tối thiểu 100.000đ. Số tiền sẽ được giữ chỗ trong khi quản trị viên xử lý.</p>`, true)}`;
-  openModal(deposit ? "Nạp tiền vào ví" : "Yêu cầu rút tiền", formShell(deposit ? "wallet-deposit" : "wallet-withdrawal", "", fields), deposit ? "Tôi đã chuyển khoản" : "Gửi yêu cầu rút");
+  openModal(deposit ? "Nạp tiền vào ví" : "Yêu cầu rút tiền", formShell(deposit ? "wallet-deposit" : "wallet-withdrawal", "", fields), deposit ? "Tạo yêu cầu nạp tiền" : "Gửi yêu cầu rút");
 }
 function walletAdjustmentModal(account) {
   if (!account) return fail(new Error("Không tìm thấy tài khoản khách hàng."));
@@ -609,7 +663,7 @@ function documentModal(document, orderId = "") {
   openModal(targetOrder ? `Tải chứng từ · ${escapeHTML(targetOrder.code)}` : "Tải chứng từ lên máy chủ", formShell("document", "", fields), "Tải lên");
 }
 async function handleRecordSubmit(e) {
-  e.preventDefault(); if (e.currentTarget.dataset.kind === "wallet-payment") { closeModal(); return; } const form = e.currentTarget; const data = new FormData(form); const kind = form.dataset.kind; const id = form.dataset.id; let walletPayment = null; let withdrawalCode = ""; const button = document.querySelector(".modal-foot [type=submit]"); button.disabled = true; button.innerHTML = '<span class="spinner"></span> Đang lưu';
+  e.preventDefault(); if (e.currentTarget.dataset.kind === "wallet-payment") { closeModal(); if (state.workspace === "customer") loadWalletSnapshot().then(render).catch(fail); return; } const form = e.currentTarget; const data = new FormData(form); const kind = form.dataset.kind; const id = form.dataset.id; let walletPayment = null; let withdrawalCode = ""; const button = document.querySelector(".modal-foot [type=submit]"); button.disabled = true; button.innerHTML = '<span class="spinner"></span> Đang lưu';
   try {
     if (kind === "wallet-adjustment") {
       const result = await walletRequest({ action: "admin-adjust", user_id: id, operation: String(data.get("operation") || ""), amount: Number(data.get("amount")), note: String(data.get("note") || "").trim() });
