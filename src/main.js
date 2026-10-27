@@ -400,6 +400,7 @@ function emptyState(ico, title, desc, action) { return `<div class="empty-state"
 
 function openModal(title, body, submitLabel = "Lưu thông tin") {
   document.querySelector("#modal-root").innerHTML = `<div class="modal-backdrop" data-modal-close><section class="modal-card" role="dialog" aria-modal="true"><div class="modal-head"><h2>${title}</h2><button type="button" class="icon-button" data-modal-close>${icon("close", 19)}</button></div><div class="modal-body">${body}</div><div class="modal-foot"><button type="button" class="btn ghost" data-modal-close>Hủy</button><button type="submit" form="record-form" class="btn primary">${submitLabel}</button></div></section></div>`;
+  if (document.querySelector('#record-form[data-kind="wallet-payment"]')) document.querySelector(".modal-card")?.classList.add("wallet-payment-modal");
   document.querySelectorAll("[data-modal-close]").forEach(el => el.addEventListener("click", e => { if (e.target === el || el.closest("button")) closeModal(); }));
   document.querySelector("#record-form")?.addEventListener("submit", handleRecordSubmit);
 }
