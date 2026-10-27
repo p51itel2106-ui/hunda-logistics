@@ -4,7 +4,7 @@ const DB_URL = String(cfg.supabaseUrl || "").replace(/\/$/, "");
 const PUBLIC_KEY = cfg.publishableKey || "";
 const BUCKET = "hunda-documents";
 const SESSION_KEY = "hunda-auth-session";
-const state = { page: "dashboard", workspace: "admin", isAdmin: false, customerAccount: null, customerAccounts: [], managedAccounts: [], wallet: null, walletAdmin: null, session: readSession(), user: null, customers: [], orders: [], customerOrders: [], transactions: [], transactionFilter: "all", documents: [], quotes: [], quoteImageUrls: {}, quoteDraft: { actual: "0", cbm: "0", convert: false }, activity: [], customerPage: "orders", search: "", month: new Date().toISOString().slice(0, 7), realtime: null };
+const state = { page: "dashboard", workspace: "admin", isAdmin: false, customerAccount: null, customerAccounts: [], managedAccounts: [], wallet: null, walletAdmin: null, session: readSession(), user: null, customers: [], orders: [], customerOrders: [], transactions: [], transactionFilter: "all", documents: [], quotes: [], quoteImageUrls: {}, quoteDraft: { actual: "0", cbm: "0", convert: false, marketplace: "taobao", productUrl: "", productSku: "", productQuantity: "1", productNote: "", dirty: false }, activity: [], customerPage: "orders", search: "", month: new Date().toISOString().slice(0, 7), realtime: null };
 
 const icons = {
   grid: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
@@ -315,12 +315,12 @@ function customerQuotesPanel() {
   }).join("");
   return '<section class="panel customer-quotes-panel"><div class="panel-heading"><div><h2>Yêu cầu báo giá & mua hộ</h2><p>Gửi thông số vận chuyển hoặc sản phẩm từ Taobao/1688 để Hunda kiểm tra và báo giá.</p></div></div>' +
     '<form id="customer-quote-form" class="customer-quote-form">' +
-    '<div class="customer-quote-fields"><label class="quote-field"><span>Nền tảng</span><select id="quote-marketplace"><option value="taobao">Taobao</option><option value="1688">1688</option><option value="other">Khác / chỉ vận chuyển</option></select></label>' +
-    '<label class="quote-field"><span>Link sản phẩm</span><input id="quote-product-url" type="url" placeholder="https://..." autocomplete="url"></label>' +
-    '<label class="quote-field"><span>Phân loại / SKU / màu / kích cỡ</span><input id="quote-product-sku" maxlength="300" placeholder="Ví dụ: màu đen, size L"></label>' +
-    '<label class="quote-field"><span>Số lượng</span><input id="quote-product-quantity" type="number" min="1" step="1" value="1" required></label>' +
+    '<div class="customer-quote-fields"><label class="quote-field"><span>Nền tảng</span><select id="quote-marketplace"><option value="taobao" ' + ((state.quoteDraft?.marketplace || "taobao") === "taobao" ? "selected" : "") + '>Taobao</option><option value="1688" ' + (state.quoteDraft?.marketplace === "1688" ? "selected" : "") + '>1688</option><option value="other" ' + (state.quoteDraft?.marketplace === "other" ? "selected" : "") + '>Khác / chỉ vận chuyển</option></select></label>' +
+    '<label class="quote-field"><span>Link sản phẩm</span><input id="quote-product-url" type="url" placeholder="https://..." autocomplete="url" value="' + escapeHTML(state.quoteDraft?.productUrl || "") + '"></label>' +
+    '<label class="quote-field"><span>Phân loại / SKU / màu / kích cỡ</span><input id="quote-product-sku" maxlength="300" placeholder="Ví dụ: màu đen, size L" value="' + escapeHTML(state.quoteDraft?.productSku || "") + '"></label>' +
+    '<label class="quote-field"><span>Số lượng</span><input id="quote-product-quantity" type="number" min="1" step="1" value="' + escapeHTML(state.quoteDraft?.productQuantity || "1") + '" required></label>' +
     '<label class="quote-field"><span>Ảnh sản phẩm (tùy chọn, tối đa 5 MB)</span><input id="quote-product-image" type="file" accept="image/png,image/jpeg,image/webp"></label>' +
-    '<label class="quote-field"><span>Ghi chú sản phẩm</span><input id="quote-product-note" maxlength="1000" placeholder="Yêu cầu đóng gói hoặc lưu ý khác"></label>' +
+    '<label class="quote-field"><span>Ghi chú sản phẩm</span><input id="quote-product-note" maxlength="1000" placeholder="Yêu cầu đóng gói hoặc lưu ý khác" value="' + escapeHTML(state.quoteDraft?.productNote || "") + '"></label>' +
     '<label class="quote-field"><span>Khối lượng thực tế (kg, nếu đã biết)</span><input id="quote-kgs" type="number" min="0" step="0.001" value="' + escapeHTML(state.quoteDraft?.actual ?? "0") + '" inputmode="decimal"></label>' +
     '<label class="quote-field"><span>Thể tích hàng (CBM, nếu đã biết)</span><input id="quote-cbm" type="number" min="0" step="0.0001" value="' + escapeHTML(state.quoteDraft?.cbm ?? "0") + '" inputmode="decimal"></label></div>' +
     '<p class="quote-formula">Có thể gửi yêu cầu mua hộ chỉ bằng link sản phẩm. Nếu có cân nặng hoặc thể tích, hệ thống sẽ tính giá vận chuyển tạm tính.</p>' +
@@ -336,11 +336,19 @@ function customerQuotesPanel() {
 function bindCustomerQuoteForm() {
   const form = document.querySelector("#customer-quote-form");
   if (!form) return;
-  const refresh = () => {
+  const refresh = (markDirty = false) => {
     const actualInput = form.querySelector("#quote-kgs");
     const cbmInput = form.querySelector("#quote-cbm");
     const convertInput = form.querySelector("#quote-convert-vnd");
-    state.quoteDraft = { actual: actualInput.value, cbm: cbmInput.value, convert: convertInput.checked };
+    state.quoteDraft = {
+      ...state.quoteDraft, actual: actualInput.value, cbm: cbmInput.value, convert: convertInput.checked,
+      marketplace: form.querySelector("#quote-marketplace").value,
+      productUrl: form.querySelector("#quote-product-url").value,
+      productSku: form.querySelector("#quote-product-sku").value,
+      productQuantity: form.querySelector("#quote-product-quantity").value,
+      productNote: form.querySelector("#quote-product-note").value,
+      dirty: state.quoteDraft.dirty || Boolean(markDirty)
+    };
     const actual = Math.max(0, Number(actualInput.value) || 0);
     const cbm = Math.max(0, Number(cbmInput.value) || 0);
     const volumeWeight = cbm * 250;
@@ -352,8 +360,9 @@ function bindCustomerQuoteForm() {
     form.querySelector("#quote-estimate-vnd").textContent = money(estimate * 3950);
     form.querySelector("#quote-vnd-result").hidden = !convertInput.checked;
   };
-  form.querySelectorAll("input").forEach(input => input.addEventListener("input", refresh));
-  form.querySelector("#quote-convert-vnd").addEventListener("change", refresh);
+  form.querySelectorAll("input").forEach(input => input.addEventListener("input", () => refresh(true)));
+  form.querySelectorAll("select").forEach(input => input.addEventListener("change", () => refresh(true)));
+  form.querySelector("#quote-convert-vnd").addEventListener("change", () => refresh(true));
   form.addEventListener("submit", async event => {
     event.preventDefault();
     const actual = Number(form.querySelector("#quote-kgs").value) || 0;
@@ -384,7 +393,7 @@ function bindCustomerQuoteForm() {
         if (imagePath) await request("/storage/v1/object/" + BUCKET + "/" + imagePath.split("/").map(encodeURIComponent).join("/"), { method: "DELETE" }).catch(() => {});
         throw error;
       }
-      state.quoteDraft = { actual: "0", cbm: "0", convert: false };
+      state.quoteDraft = { actual: "0", cbm: "0", convert: false, marketplace: "taobao", productUrl: "", productSku: "", productQuantity: "1", productNote: "", dirty: false };
       await loadCustomerData(); render(); showToast("Đã gửi yêu cầu để Hunda kiểm tra và báo giá.");
     } catch (error) {
       fail(error); button.disabled = false; button.innerHTML = icon("arrow", 15) + " Gửi yêu cầu";
@@ -746,7 +755,7 @@ function bootstrap() {
 }
 document.addEventListener("click", e => { const btn = e.target.closest("[data-action]"); if (btn) action(btn.dataset.action, btn.dataset.id); });
 window.addEventListener("storage", e => { if (e.key === SESSION_KEY) location.reload(); });
-document.addEventListener("visibilitychange", () => { if (!document.hidden && state.session) loadData().then(render).catch(() => {}); });
-setInterval(() => { if (!document.hidden && state.session && state.workspace === "customer") Promise.all([loadCustomerData(), loadWalletSnapshot()]).then(() => { if (document.querySelector(".app-shell") && !document.querySelector(".modal-backdrop")) render(); }).catch(() => {}); }, 8000);
+document.addEventListener("visibilitychange", () => { if (!document.hidden && state.session && state.workspace === "customer") Promise.all([loadCustomerData(), loadWalletSnapshot()]).then(() => { if (!state.quoteDraft?.dirty) render(); }).catch(() => {}); else if (!document.hidden && state.session) loadData().then(render).catch(() => {}); });
+setInterval(() => { if (!document.hidden && state.session && state.workspace === "customer") Promise.all([loadCustomerData(), loadWalletSnapshot()]).then(() => { if (!state.quoteDraft?.dirty && document.querySelector(".app-shell") && !document.querySelector(".modal-backdrop")) render(); }).catch(() => {}); }, 8000);
 setInterval(() => { if (!document.hidden && state.session && state.workspace === "admin") loadData().then(() => { if (document.querySelector(".app-shell") && !document.querySelector(".modal-backdrop")) render(); }).catch(() => {}); }, 45000);
 bootstrap();
