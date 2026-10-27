@@ -39,7 +39,7 @@ Deno.serve(async (req: Request) => {
     if (action === "snapshot") {
       const [{ data: wallet, error: walletError }, { data: transactions, error: transactionError }, { data: bank, error: bankError }] = await Promise.all([
         adminClient.from("user_wallets").select("balance").eq("user_id", user.id).maybeSingle(),
-        adminClient.from("wallet_transactions").select("id,transaction_type,amount,status,bank_name,bank_account,bank_holder,note,admin_note,created_at,decided_at").eq("user_id", user.id).order("created_at", { ascending: false }).limit(30),
+        adminClient.from("wallet_transactions").select("id,transaction_type,amount,status,bank_name,bank_account,bank_holder,note,admin_note,transfer_code,created_at,decided_at").eq("user_id", user.id).order("created_at", { ascending: false }).limit(30),
         adminClient.from("wallet_settings").select("bank_name,bank_code,bank_account,bank_holder,transfer_note").eq("id", 1).maybeSingle(),
       ]);
       if (walletError) throw walletError;
@@ -94,7 +94,9 @@ Deno.serve(async (req: Request) => {
         });
         return json({ transaction_id: transactionId, amount, transfer_code: transaction.transfer_code, qr_url: "https://vietqr.app/img?" + params.toString(), bank }, 201);
       }
-      return json({ transaction_id: transactionId }, 201);
+      const { data: transaction, error: transactionError } = await adminClient.from("wallet_transactions").select("transfer_code").eq("id", transactionId).single();
+      if (transactionError) throw transactionError;
+      return json({ transaction_id: transactionId, transfer_code: transaction.transfer_code }, 201);
     }
 
     if (!await requireAdmin()) return json({ error: "Bạn không có quyền quản lý ví." }, 403);
