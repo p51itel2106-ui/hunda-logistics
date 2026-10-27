@@ -99,6 +99,26 @@ Deno.serve(async (req: Request) => {
 
     if (!await requireAdmin()) return json({ error: "Bạn không có quyền quản lý ví." }, 403);
 
+    if (action === "admin-adjust") {
+      const targetUserId = String(body?.user_id || "");
+      const operation = String(body?.operation || "");
+      const amount = Number(body?.amount);
+      const note = String(body?.note || "").trim();
+      if (!targetUserId) return json({ error: "Chọn tài khoản cần điều chỉnh." }, 400);
+      if (!["credit", "debit"].includes(operation)) return json({ error: "Chọn cộng hoặc trừ tiền." }, 400);
+      if (!Number.isSafeInteger(amount) || amount <= 0) return json({ error: "Số tiền phải là số nguyên lớn hơn 0." }, 400);
+      if (!note) return json({ error: "Vui lòng nhập lý do điều chỉnh." }, 400);
+      const { data: transactionId, error } = await adminClient.rpc("hunda_admin_adjust_wallet", {
+        p_user_id: targetUserId,
+        p_operation: operation,
+        p_amount: amount,
+        p_admin_id: user.id,
+        p_note: note,
+      });
+      if (error) return json({ error: error.message }, 400);
+      return json({ transaction_id: transactionId, balance_updated: true }, 200);
+    }
+
     if (action === "admin-list") {
       const [{ data: requests, error: requestsError }, { data: bank, error: bankError }, { data: usersResult, error: usersError }, { data: profiles, error: profilesError }] = await Promise.all([
         adminClient.from("wallet_transactions").select("*").order("created_at", { ascending: false }).limit(200),
