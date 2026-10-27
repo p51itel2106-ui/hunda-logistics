@@ -114,7 +114,7 @@ Deno.serve(async (req: Request) => {
       const emails = new Map((usersResult?.users || []).map((item) => [item.id, item.email || ""]));
       const names = new Map((profiles || []).map((item) => [item.user_id, item.full_name || ""]));
       return json({
-        requests: (requests || []).map((item) => ({ ...item, email: emails.get(item.user_id) || "", full_name: names.get(item.user_id) || authUsers.get(item.user_id)?.user_metadata?.full_name || "" })),
+        requests: (requests || []).map((item) => ({ ...item, email: emails.get(item.user_id) || "", full_name: names.get(item.user_id) || authUsers.get(item.user_id)?.user_metadata?.full_name || "", reviewer_email: item.decided_by ? emails.get(item.decided_by) || "" : "" })),
         bank: bank || { bank_name: "", bank_account: "", bank_holder: "", transfer_note: "HUNDA" },
       });
     }
