@@ -330,3 +330,5 @@ body{background:var(--canvas)}
 .wallet-payment-modal .form-grid{display:block}
 .wallet-payment-modal .wallet-payment{width:100%}
 @media(max-width:480px){.wallet-payment-modal{max-height:calc(100dvh - 24px)}}
+
+.document-count{display:inline-flex;align-items:center;padding:4px 8px;border-radius:999px;background:#eef6f0;color:#39734e;font-size:10px;font-weight:600;white-space:nowrap}
