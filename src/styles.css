@@ -332,3 +332,26 @@ body{background:var(--canvas)}
 @media(max-width:480px){.wallet-payment-modal{max-height:calc(100dvh - 24px)}}
 
 .document-count{display:inline-flex;align-items:center;padding:4px 8px;border-radius:999px;background:#eef6f0;color:#39734e;font-size:10px;font-weight:600;white-space:nowrap}
+
+
+/* Customer order management and per-order document history */
+.customer-order-management .table-wrap{overflow-x:auto}
+.customer-order-doc-list{display:grid;gap:6px;margin-bottom:8px;min-width:180px}
+.customer-order-doc{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:5px;padding:5px 7px;border:1px solid #e9eeeb;border-radius:8px;background:#fbfcfb}
+.customer-order-doc .plain-link{display:inline-flex;align-items:center;gap:5px;min-width:0;overflow:hidden;text-align:left;text-overflow:ellipsis;white-space:nowrap;font-size:10px}
+.customer-order-doc>small{color:#849087;font-size:9px;white-space:nowrap}
+.customer-order-doc .icon-button{width:25px;height:25px}
+.customer-order-history-list{display:grid;padding:4px 20px 18px}
+.customer-order-history-item{display:grid;grid-template-columns:34px minmax(0,1fr);gap:12px;padding:16px 0;border-bottom:1px solid #edf0ed}
+.customer-order-history-item:last-child{border-bottom:0}
+.customer-order-history-mark{display:grid;width:34px;height:34px;place-items:center;border-radius:11px;background:#eef6f0;color:#28704e}
+.customer-order-history-content{min-width:0}
+.customer-order-history-top{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.customer-order-history-top>b{font-size:13px;color:#183047}
+.customer-order-history-content>p{margin:7px 0;color:#53635b;font-size:12px;line-height:1.6}
+.customer-order-history-content>small{color:#87928c;font-size:10px}
+.customer-order-history-content .customer-admin-note{display:block;margin:7px 0;padding:9px 11px;border-radius:8px;background:#fff7ed;color:#9b5414;font-size:11px;line-height:1.5}
+@media(max-width:760px){
+ .customer-order-management .table-wrap table{min-width:760px}
+ .customer-order-history-list{padding-right:14px;padding-left:14px}
+}
