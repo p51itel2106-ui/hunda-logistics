@@ -63,16 +63,17 @@ const dateTime = value => value ? new Intl.DateTimeFormat("vi-VN", { day: "2-dig
 const isoDate = () => new Date().toISOString().slice(0, 10);
 const monthLabel = value => new Intl.DateTimeFormat("vi-VN", { month: "long", year: "numeric" }).format(new Date(`${value}-01T12:00:00`));
 
-function readSession() { try { return JSON.parse(localStorage.getItem(SESSION_KEY) || "null"); } catch { return null; } }
+function readSession() { try { return JSON.parse(sessionStorage.getItem(SESSION_KEY) || "null"); } catch { return null; } }
 function saveSession(session) {
   const hadSession = Boolean(state.session);
   state.session = session;
   if (session) {
-    localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
     if (!hadSession && !localStorage.getItem(LAST_ACTIVITY_KEY)) localStorage.setItem(LAST_ACTIVITY_KEY, String(Date.now()));
   } else {
-    localStorage.removeItem(SESSION_KEY);
+    sessionStorage.removeItem(SESSION_KEY);
     localStorage.removeItem(LAST_ACTIVITY_KEY);
+    try { localStorage.setItem("hunda-session-signal", String(Date.now())); } catch {}
   }
 }
 function markUserActivity() {
@@ -968,7 +969,7 @@ document.addEventListener("click", e => { markUserActivity(); const btn = e.targ
 });
 window.addEventListener("pointermove", markUserActivity, { passive: true });
 window.addEventListener("storage", e => {
-  if (e.key === SESSION_KEY) location.reload();
+  if (e.key === "hunda-session-signal") { sessionStorage.removeItem(SESSION_KEY); location.reload(); }
   if (e.key === LAST_ACTIVITY_KEY && state.session) void enforceIdleTimeout();
 });
 setInterval(() => { void enforceIdleTimeout(); }, 15000);
