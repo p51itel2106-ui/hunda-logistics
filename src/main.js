@@ -116,7 +116,7 @@ function shell(content) {
   bindShell();
 }
 function pageAction() {
-  if (state.page === "orders") return `<button class="btn primary" data-action="new-order">${icon("plus", 17)} Tạo đơn hàng</button>`;
+  if (state.page === "orders") return `<button class="btn ghost" data-action="export-orders">${icon("download", 16)} Xuất Excel (CSV)</button><button class="btn primary" data-action="new-order">${icon("plus", 17)} Tạo đơn hàng</button>`;
   if (state.page === "customers") return `<button class="btn ghost" data-action="new-customer">${icon("plus", 16)} Thêm khách hàng</button><button class="btn primary" data-action="new-account">${icon("users", 16)} Cấp tài khoản</button>`;
   if (state.page === "transactions") return `<button class="btn primary" data-action="new-transaction">${icon("plus", 17)} Ghi nhận thu chi</button>`;
   if (state.page === "documents") return `<button class="btn primary" data-action="new-document">${icon("upload", 17)} Tải chứng từ</button>`;
@@ -240,6 +240,42 @@ function toolbar(placeholder = "Tìm kiếm...") { return `<div class="table-too
 function ordersView() {
   let rows = state.orders.filter(o => [o.code, o.cargo_description, o.route, o.customer?.name].join(" ").toLowerCase().includes(state.search));
   return `<section class="panel table-panel">${toolbar("Tìm mã đơn, khách hàng, tuyến...")}${orderTable(rows, true)}</section>`;
+}
+
+function exportOrdersToExcel() {
+  const rows = state.orders.filter(o => [o.code, o.cargo_description, o.route, o.customer?.name].join(" ").toLowerCase().includes(state.search));
+  if (!rows.length) { showToast("Không có đơn hàng để xuất.", "error"); return; }
+  const statusLabels = { new: "Mới tiếp nhận", in_progress: "Đang vận chuyển", completed: "Hoàn tất", cancelled: "Đã hủy" };
+  const columns = [
+    ["Mã đơn hàng", o => o.code],
+    ["Khách hàng", o => o.customer?.name || "Khách lẻ"],
+    ["Tuyến vận chuyển", o => o.route || ""],
+    ["Mô tả hàng hóa", o => o.cargo_description || ""],
+    ["Giá trị đơn (VND)", o => Number(o.amount || 0)],
+    ["Trạng thái", o => statusLabels[o.status] || o.status || ""],
+    ["Số chứng từ", o => state.documents.filter(doc => doc.order_id === o.id).length],
+    ["Mã báo giá", o => o.quote_id || ""],
+    ["Ghi chú nội bộ", o => o.admin_note || o.note || ""],
+    ["Ngày tạo", o => o.created_at ? new Date(o.created_at).toLocaleString("sv-SE", { timeZone: "Asia/Ho_Chi_Minh" }).replace(" ", "T") : ""],
+    ["Cập nhật lần cuối", o => o.updated_at ? new Date(o.updated_at).toLocaleString("sv-SE", { timeZone: "Asia/Ho_Chi_Minh" }).replace(" ", "T") : ""]
+  ];
+  const safeCell = value => {
+    let text = value == null ? "" : String(value);
+    // Prevent spreadsheet formula injection for text fields.
+    if (/^[\s]*[=+@]/.test(text) || /^[\s]*-/.test(text)) text = "'" + text;
+    return '"' + text.replace(/"/g, '""') + '"';
+  };
+  const csv = [columns.map(([label]) => safeCell(label)).join(","), ...rows.map(row => columns.map(([, get]) => safeCell(get(row))).join(","))].join("\r\n");
+  const blob = new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "hunda-don-hang-" + isoDate() + ".csv";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+  showToast("Đã xuất " + rows.length + " đơn hàng. Mở file CSV bằng Excel để xem dữ liệu.");
 }
 function orderTable(rows, actions) {
   if (!rows.length) return emptyState("box", "Chưa có đơn hàng", "Tạo đơn hàng đầu tiên để bắt đầu quản lý vận hành.", "new-order");
@@ -509,6 +545,7 @@ function action(actionName, id) {
   if (actionName === "switch-admin") { switchToAdminWorkspace(); return; }
   if (actionName === "new-customer-order") return customerOrderModal(id || "");
   if (actionName === "approve-quote") return quoteApprovalModal(id);
+  if (actionName === "export-orders") return exportOrdersToExcel();
   if (actionName === "refresh") { loadData().then(render).catch(fail); return; }
   if (actionName === "new-order") return orderModal();
   if (actionName === "edit-order") return orderModal(state.orders.find(o => o.id === id));
