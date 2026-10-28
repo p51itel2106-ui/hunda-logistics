@@ -42,6 +42,20 @@ Deno.serve(async (req: Request) => {
     const { data: { user }, error: authError } = await authClient.auth.getUser(token);
     if (authError || !user) return json({ error: "Phiên đăng nhập không hợp lệ." }, 401);
 
+    const body = await req.json();
+    if (body?.action === "check-access") {
+      const [{ data: adminRow, error: adminCheckError }, { data: profileRow, error: profileCheckError }] = await Promise.all([
+        adminClient.from("admin_users").select("active").eq("user_id", user.id).maybeSingle(),
+        adminClient.from("customer_accounts").select("user_id").eq("user_id", user.id).maybeSingle(),
+      ]);
+      if (adminCheckError) throw adminCheckError;
+      if (profileCheckError) throw profileCheckError;
+      const { data: authInfo, error: authInfoError } = await adminClient.auth.admin.getUserById(user.id);
+      if (authInfoError) throw authInfoError;
+      const isLocked = Boolean(authInfo.user?.banned_until) || (adminRow ? adminRow.active !== true : !profileRow);
+      return json({ allowed: !isLocked, suspended: isLocked });
+    }
+
     const { data: membership, error: membershipError } = await adminClient
       .from("admin_users")
       .select("user_id,permissions")
@@ -49,11 +63,9 @@ Deno.serve(async (req: Request) => {
       .eq("active", true)
       .maybeSingle();
     if (membershipError) throw membershipError;
-    if (!membership) return json({ error: "Bạn không có quyền cấp tài khoản." }, 403);
+    if (!membership) return json({ error: "Bạn không có quyền quản lý tài khoản." }, 403);
     const grantedPermissions = membership.permissions || {};
     if (grantedPermissions.accounts !== true) return json({ error: "Bạn chưa được cấp quyền quản lý tài khoản." }, 403);
-
-    const body = await req.json();
     if (body?.action === "list") {
       const [{ data: adminRows, error: adminError }, { data: profileRows, error: profileError }, walletResult, { data: usersResult, error: usersError }] = await Promise.all([
         adminClient.from("admin_users").select("user_id,email,active,permissions,created_at"),
@@ -93,6 +105,41 @@ Deno.serve(async (req: Request) => {
         })
         .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
       return json({ accounts });
+    }
+
+    if (body?.action === "set-status") {
+      const targetId = String(body.user_id || "");
+      const lock = body.active === false;
+      if (!targetId || !["admin", "customer"].includes(body.role)) return json({ error: "Tài khoản không hợp lệ." }, 400);
+      if (targetId === user.id) return json({ error: "Bạn không thể tự khóa tài khoản đang sử dụng." }, 400);
+      const [{ data: targetAdmin, error: targetAdminError }, { data: targetProfile, error: targetProfileError }] = await Promise.all([
+        adminClient.from("admin_users").select("user_id,active,email").eq("user_id", targetId).maybeSingle(),
+        adminClient.from("customer_accounts").select("user_id,full_name").eq("user_id", targetId).maybeSingle(),
+      ]);
+      if (targetAdminError) throw targetAdminError;
+      if (targetProfileError) throw targetProfileError;
+      if (body.role === "admin" && !targetAdmin) return json({ error: "Không tìm thấy tài khoản quản trị." }, 404);
+      if (body.role === "customer" && !targetProfile) return json({ error: "Không tìm thấy tài khoản khách hàng." }, 404);
+      const { data: targetAuth, error: targetAuthError } = await adminClient.auth.admin.getUserById(targetId);
+      if (targetAuthError || !targetAuth.user) return json({ error: "Không tìm thấy tài khoản đăng nhập." }, 404);
+      const { error: banError } = await adminClient.auth.admin.updateUserById(targetId, { ban_duration: lock ? "876000h" : "none" });
+      if (banError) throw banError;
+      if (targetAdmin) {
+        const { error: updateAdminError } = await adminClient.from("admin_users").update({ active: !lock }).eq("user_id", targetId);
+        if (updateAdminError) throw updateAdminError;
+      }
+      const { error: auditError } = await adminClient.from("activity_log").insert({
+        actor_id: user.id,
+        actor_email: user.email || "",
+        actor_role: "admin",
+        action: "UPDATE",
+        entity_type: "account",
+        record_id: targetId,
+        record_label: targetAuth.user.email || targetProfile?.full_name || targetAdmin?.email || targetId,
+        changed_fields: [lock ? "account_locked" : "account_unlocked"],
+      });
+      if (auditError) throw auditError;
+      return json({ success: true, user_id: targetId, active: !lock });
     }
 
     if (body?.action !== "create") return json({ error: "Thao tác không hợp lệ." }, 400);
