@@ -320,7 +320,8 @@ function customersView() {
   const pendingDepositCount = requests.filter(request => request.status === "pending" && ["deposit", "admin_credit"].includes(request.transaction_type)).length;
   const pendingWithdrawalCount = requests.filter(request => request.status === "pending" && ["withdrawal", "admin_debit"].includes(request.transaction_type)).length;
   const walletTabs = `<div class="wallet-history-tabs" role="tablist" aria-label="Phân loại yêu cầu ví"><button type="button" role="tab" aria-selected="${walletTab === "deposit"}" class="${walletTab === "deposit" ? "active" : ""}" data-action="wallet-history-tab" data-id="deposit">Nạp tiền${pendingDepositCount ? `<span>${pendingDepositCount}</span>` : ""}</button><button type="button" role="tab" aria-selected="${walletTab === "withdrawal"}" class="${walletTab === "withdrawal" ? "active" : ""}" data-action="wallet-history-tab" data-id="withdrawal">Rút tiền${pendingWithdrawalCount ? `<span>${pendingWithdrawalCount}</span>` : ""}</button></div>`;
-  return `${accountPanel}${walletTabs}${walletRequestsPanel}${walletHistoryPanel}<section class="panel table-panel customer-records-panel">${toolbar("Tìm tên, công ty, email...")}${table}</section>`;
+  const customerPanel = hasPermission("customers") ? `<section class="panel table-panel customer-records-panel">${toolbar("Tìm tên, công ty, email...")}${table}</section>` : "";
+  return `${hasPermission("accounts") ? accountPanel : ""}${hasPermission("wallet") ? `${walletTabs}${walletRequestsPanel}${walletHistoryPanel}` : ""}${customerPanel}`;
 }
 function transactionsView() {
   const rows = state.transactions.filter(t => {
@@ -790,16 +791,17 @@ async function confirmDelete(label, id, table) {
 
 async function loadData() {
   if (!state.session) return;
+  const canDashboard = hasPermission("dashboard");
   const [customers, orders, transactions, documents, activity, customerAccounts, quotes, managedAccounts, walletAdmin] = await Promise.all([
-    api("customers?select=*&order=created_at.desc"),
-    api("orders?select=*,customer:customers(name)&order=created_at.desc"),
-    api("transactions?select=*,customer:customers(name),order:orders(code)&order=transaction_date.desc,created_at.desc"),
-    api("order_documents?select=*,order:orders(code)&order=created_at.desc"),
-    api("activity_log?select=*&order=occurred_at.desc&limit=200"),
-    api("customer_accounts?select=user_id,customer_id,full_name&order=created_at.desc"),
-    api("customer_quotes?select=*&order=created_at.desc"),
-    accountAdminRequest({ action: "list" }),
-    walletRequest({ action: "admin-list" })
+    hasPermission("customers") ? api("customers?select=*&order=created_at.desc") : Promise.resolve([]),
+    hasPermission("orders") || canDashboard ? api("orders?select=*,customer:customers(name)&order=created_at.desc") : Promise.resolve([]),
+    hasPermission("transactions") || hasPermission("reports") || canDashboard ? api("transactions?select=*,customer:customers(name),order:orders(code)&order=transaction_date.desc,created_at.desc") : Promise.resolve([]),
+    hasPermission("documents") ? api("order_documents?select=*,order:orders(code)&order=created_at.desc") : Promise.resolve([]),
+    hasPermission("activity") ? api("activity_log?select=*&order=occurred_at.desc&limit=200") : Promise.resolve([]),
+    hasPermission("accounts") ? api("customer_accounts?select=user_id,customer_id,full_name&order=created_at.desc") : Promise.resolve([]),
+    hasPermission("quotes") ? api("customer_quotes?select=*&order=created_at.desc") : Promise.resolve([]),
+    hasPermission("accounts") ? accountAdminRequest({ action: "list" }) : Promise.resolve({ accounts: [] }),
+    hasPermission("wallet") ? walletRequest({ action: "admin-list" }) : Promise.resolve({ requests: [], bank: null })
   ]);
   state.customers = customers || [];
   state.orders = orders || [];
@@ -827,8 +829,8 @@ function startRealtime() {
     .subscribe(status => { state.realtimeStatus = status; if (state.page === "activity" && state.workspace === "admin") render(); });
 }
 async function checkAdmin() {
-  try { const rows = await api(`admin_users?select=user_id&user_id=eq.${encodeURIComponent(state.user.id)}&active=eq.true`); return rows.length > 0; }
-  catch { return false; }
+  try { const rows = await api(`admin_users?select=user_id,permissions&user_id=eq.${encodeURIComponent(state.user.id)}&active=eq.true`); state.permissions = rows[0]?.permissions || {}; return rows.length > 0; }
+  catch { state.permissions = {}; return false; }
 }
 async function authRequest(route, body) { return request(`/auth/v1/${route}`, { method: "POST", body: JSON.stringify(body) }, false); }
 async function signIn(email, password) {
