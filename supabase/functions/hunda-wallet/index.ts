@@ -31,9 +31,9 @@ Deno.serve(async (req: Request) => {
     const action = body?.action;
 
     const requireAdmin = async () => {
-      const { data, error } = await adminClient.from("admin_users").select("user_id").eq("user_id", user.id).eq("active", true).maybeSingle();
+      const { data, error } = await adminClient.from("admin_users").select("user_id,permissions").eq("user_id", user.id).eq("active", true).maybeSingle();
       if (error) throw error;
-      return Boolean(data);
+      return Boolean(data && data.permissions?.wallet === true);
     };
 
     if (action === "snapshot") {
@@ -99,7 +99,7 @@ Deno.serve(async (req: Request) => {
       return json({ transaction_id: transactionId, transfer_code: transaction.transfer_code }, 201);
     }
 
-    if (!await requireAdmin()) return json({ error: "Bạn không có quyền quản lý ví." }, 403);
+    if (!await requireAdmin()) return json({ error: "Bạn chưa được cấp quyền quản lý ví." }, 403);
 
     if (action === "admin-adjust") {
       const targetUserId = String(body?.user_id || "");
