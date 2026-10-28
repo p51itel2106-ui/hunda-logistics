@@ -408,3 +408,11 @@ body{background:var(--canvas)}
   .auth-brand-copy>small{font-size:8px;letter-spacing:1.7px}
 }
 
+.customer-nav-group{display:grid;gap:3px}
+.customer-nav-toggle{width:100%}
+.customer-nav-caret{margin-left:auto;color:#91aa9b;font-size:16px;line-height:1}
+.customer-nav-children{display:grid;gap:3px;margin:0 0 6px 30px;padding-left:12px;border-left:1px solid rgba(220,233,225,.2)}
+.customer-nav-child{min-height:35px;padding:0 10px;border:0;border-radius:7px;background:transparent;color:#a9beb1;text-align:left;font-size:11px;font-weight:500}
+.customer-nav-child:hover{color:#fff;background:rgba(255,255,255,.06)}
+.customer-nav-child.active{color:#effff4;background:#174a37;font-weight:600}
+
