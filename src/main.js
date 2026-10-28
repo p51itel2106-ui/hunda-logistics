@@ -4,6 +4,10 @@ const DB_URL = String(cfg.supabaseUrl || "").replace(/\/$/, "");
 const PUBLIC_KEY = cfg.publishableKey || "";
 const BUCKET = "hunda-documents";
 const SESSION_KEY = "hunda-auth-session";
+const LAST_ACTIVITY_KEY = "hunda-last-activity";
+const IDLE_TIMEOUT_MS = 10 * 60 * 1000;
+let lastActivityWrite = 0;
+let signOutInProgress = false;
 const PERMISSION_ITEMS = [
   ["dashboard", "Tổng quan", "Xem dashboard và chỉ số tóm tắt"],
   ["orders", "Đơn hàng", "Xem, tạo, sửa, xóa và xuất dữ liệu đơn hàng"],
@@ -60,7 +64,39 @@ const isoDate = () => new Date().toISOString().slice(0, 10);
 const monthLabel = value => new Intl.DateTimeFormat("vi-VN", { month: "long", year: "numeric" }).format(new Date(`${value}-01T12:00:00`));
 
 function readSession() { try { return JSON.parse(localStorage.getItem(SESSION_KEY) || "null"); } catch { return null; } }
-function saveSession(session) { state.session = session; session ? localStorage.setItem(SESSION_KEY, JSON.stringify(session)) : localStorage.removeItem(SESSION_KEY); }
+function saveSession(session) {
+  const hadSession = Boolean(state.session);
+  state.session = session;
+  if (session) {
+    localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+    if (!hadSession && !localStorage.getItem(LAST_ACTIVITY_KEY)) localStorage.setItem(LAST_ACTIVITY_KEY, String(Date.now()));
+  } else {
+    localStorage.removeItem(SESSION_KEY);
+    localStorage.removeItem(LAST_ACTIVITY_KEY);
+  }
+}
+function markUserActivity() {
+  if (!state.session) return;
+  const now = Date.now();
+  if (now - lastActivityWrite < 15000) return;
+  lastActivityWrite = now;
+  try { localStorage.setItem(LAST_ACTIVITY_KEY, String(now)); } catch {}
+}
+async function enforceIdleTimeout() {
+  if (!state.session || signOutInProgress) return;
+  let last = 0;
+  try { last = Number(localStorage.getItem(LAST_ACTIVITY_KEY) || 0); } catch {}
+  if (!last) {
+    try { localStorage.setItem(LAST_ACTIVITY_KEY, String(Date.now())); } catch {}
+    return;
+  }
+  if (Date.now() - last >= IDLE_TIMEOUT_MS) {
+    signOutInProgress = true;
+    try { await signOut(); }
+    finally { signOutInProgress = false; }
+    authShell("login", "Phiên đăng nhập đã tự động kết thúc sau 10 phút không hoạt động.");
+  }
+}
 function headers(extra = {}) { return { apikey: PUBLIC_KEY, Authorization: `Bearer ${state.session?.access_token || PUBLIC_KEY}`, ...extra }; }
 async function accountAdminRequest(payload) { return request("/functions/v1/hunda-admin-accounts", { method: "POST", body: JSON.stringify(payload) }); }
 async function walletRequest(payload) { return request("/functions/v1/hunda-wallet", { method: "POST", body: JSON.stringify(payload) }); }
@@ -869,10 +905,16 @@ async function updatePassword(password) {
   authShell("login", "Mật khẩu đã được cập nhật. Hãy đăng nhập bằng mật khẩu mới.");
 }
 async function signOut() {
-  await recordLoginEvent("logout");
-  if (state.realtime) { try { await state.realtime.unsubscribe(); } catch {} state.realtime = null; }
-  try { if (state.session?.access_token) await request("/auth/v1/logout", { method: "POST" }); } catch { /* Local sign-out still completes when the server session expired. */ }
-  saveSession(null); state.user = null; state.workspace = "admin"; state.isAdmin = false; state.customerAccount = null; state.customerAccounts = []; state.customers = []; state.orders = []; state.customerOrders = []; state.transactions = []; state.documents = []; state.activity = []; state.wallet = null; state.walletAdmin = null; state.managedAccounts = []; authShell("login");
+  if (signOutInProgress) return;
+  signOutInProgress = true;
+  try {
+    await recordLoginEvent("logout");
+    if (state.realtime) { try { await state.realtime.unsubscribe(); } catch {} state.realtime = null; }
+    try { if (state.session?.access_token) await request("/auth/v1/logout", { method: "POST" }); } catch { /* Local sign-out still completes when the server session expired. */ }
+    saveSession(null); state.user = null; state.workspace = "admin"; state.isAdmin = false; state.customerAccount = null; state.customerAccounts = []; state.customers = []; state.orders = []; state.customerOrders = []; state.transactions = []; state.documents = []; state.activity = []; state.wallet = null; state.walletAdmin = null; state.managedAccounts = []; authShell("login");
+  } finally {
+    signOutInProgress = false;
+  }
 }
 async function enterApp() {
   root.innerHTML = `<main class="loading-screen"><span class="loader"></span><p>Đang đồng bộ Hunda Logistics...</p></main>`;
@@ -909,12 +951,29 @@ function bootstrap() {
     history.replaceState(null, "", location.pathname + location.search);
     if (isRecovery) { authShell("reset"); return; }
   }
+  if (state.session?.access_token) {
+    const lastActivity = Number(localStorage.getItem(LAST_ACTIVITY_KEY) || 0);
+    if (lastActivity && Date.now() - lastActivity >= IDLE_TIMEOUT_MS) {
+      saveSession(null);
+      authShell("login", "Phiên đăng nhập đã tự động kết thúc sau 10 phút không hoạt động.");
+      return;
+    }
+    if (!lastActivity) localStorage.setItem(LAST_ACTIVITY_KEY, String(Date.now()));
+  }
   if (!state.session?.access_token) { authShell("login"); return; }
   state.user = state.session.user || null;
   request("/auth/v1/user").then(user => { state.user = user; return enterApp(); }).catch(async () => { if (await refreshSession()) { const user = await request("/auth/v1/user"); state.user = user; await enterApp(); } else { saveSession(null); authShell("login"); } });
 }
-document.addEventListener("click", e => { const btn = e.target.closest("[data-action]"); if (btn) action(btn.dataset.action, btn.dataset.id); });
-window.addEventListener("storage", e => { if (e.key === SESSION_KEY) location.reload(); });
+document.addEventListener("click", e => { markUserActivity(); const btn = e.target.closest("[data-action]"); if (btn) action(btn.dataset.action, btn.dataset.id); });
+["keydown", "pointerdown", "touchstart", "scroll", "input"].forEach(eventName => {
+  document.addEventListener(eventName, markUserActivity, { passive: true });
+});
+window.addEventListener("pointermove", markUserActivity, { passive: true });
+window.addEventListener("storage", e => {
+  if (e.key === SESSION_KEY) location.reload();
+  if (e.key === LAST_ACTIVITY_KEY && state.session) void enforceIdleTimeout();
+});
+setInterval(() => { void enforceIdleTimeout(); }, 15000);
 document.addEventListener("visibilitychange", () => { if (!document.hidden && state.session && state.workspace === "customer") Promise.all([loadCustomerData(), loadWalletSnapshot()]).then(() => { if (!state.quoteDraft?.dirty) render(); }).catch(() => {}); else if (!document.hidden && state.session) loadData().then(render).catch(() => {}); });
 setInterval(() => { if (!document.hidden && state.session && state.workspace === "customer") Promise.all([loadCustomerData(), loadWalletSnapshot()]).then(() => { if (!state.quoteDraft?.dirty && document.querySelector(".app-shell") && !document.querySelector(".modal-backdrop")) render(); }).catch(() => {}); }, 8000);
 setInterval(() => { if (!document.hidden && state.session && state.workspace === "admin") loadData().then(() => { if (document.querySelector(".app-shell") && !document.querySelector(".modal-backdrop")) render(); }).catch(() => {}); }, 45000);
