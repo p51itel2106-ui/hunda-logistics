@@ -41,17 +41,19 @@ Deno.serve(async (req: Request) => {
 
     const { data: membership, error: membershipError } = await adminClient
       .from("admin_users")
-      .select("user_id")
+      .select("user_id,permissions")
       .eq("user_id", user.id)
       .eq("active", true)
       .maybeSingle();
     if (membershipError) throw membershipError;
     if (!membership) return json({ error: "Bạn không có quyền cấp tài khoản." }, 403);
+    const grantedPermissions = membership.permissions || {};
+    if (grantedPermissions.accounts !== true) return json({ error: "Bạn chưa được cấp quyền quản lý tài khoản." }, 403);
 
     const body = await req.json();
     if (body?.action === "list") {
       const [{ data: adminRows, error: adminError }, { data: profileRows, error: profileError }, { data: walletRows, error: walletError }, { data: usersResult, error: usersError }] = await Promise.all([
-        adminClient.from("admin_users").select("user_id,email,active,created_at"),
+        adminClient.from("admin_users").select("user_id,email,active,permissions,created_at"),
         adminClient.from("customer_accounts").select("user_id,customer_id,full_name,phone,billing_company,created_at"),
         adminClient.from("user_wallets").select("user_id,balance"),
         adminClient.auth.admin.listUsers({ page: 1, perPage: 1000 }),
@@ -76,6 +78,7 @@ Deno.serve(async (req: Request) => {
             phone: profile?.phone || authUser.user_metadata?.phone || "",
             company: profile?.billing_company || authUser.user_metadata?.billing_company || "",
             role: admin ? "admin" : "customer",
+            permissions: admin?.permissions || {},
             balance: Number(wallets.get(authUser.id)?.balance || 0),
             active: admin ? admin.active && !authUser.banned_until : !authUser.banned_until,
             email_confirmed: Boolean(authUser.email_confirmed_at),
@@ -94,11 +97,14 @@ Deno.serve(async (req: Request) => {
     const company = String(account.company || "").trim();
     const password = String(account.password || "");
     const role = account.role;
+    const permissionKeys = ["dashboard", "orders", "customers", "transactions", "reports", "documents", "quotes", "activity", "accounts", "wallet"];
+    const permissions = role === "admin" ? Object.fromEntries(permissionKeys.map((key) => [key, account.permissions?.[key] === true])) : {};
 
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json({ error: "Email chưa đúng định dạng." }, 400);
+    if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) return json({ error: "Email chưa đúng định dạng." }, 400);
     if (!fullName) return json({ error: "Vui lòng nhập họ và tên." }, 400);
     if (!["customer", "admin"].includes(role)) return json({ error: "Vai trò không hợp lệ." }, 400);
     if (password.length < 8) return json({ error: "Mật khẩu khởi tạo cần ít nhất 8 ký tự." }, 400);
+    if (role === "admin" && !Object.values(permissions).some(Boolean)) return json({ error: "Hãy chọn ít nhất một chức năng cho quản trị viên." }, 400);
 
     const { data: created, error: createError } = await adminClient.auth.admin.createUser({
       email,
@@ -115,6 +121,7 @@ Deno.serve(async (req: Request) => {
         user_id: created.user.id,
         email,
         active: true,
+        permissions,
       });
       if (insertError) {
         await adminClient.auth.admin.deleteUser(created.user.id);
@@ -123,7 +130,7 @@ Deno.serve(async (req: Request) => {
     }
 
     return json({
-      account: { user_id: created.user.id, email, full_name: fullName, phone, company, role, active: true },
+      account: { user_id: created.user.id, email, full_name: fullName, phone, company, role, permissions, active: true },
     }, 201);
   } catch (error) {
     console.error("Hunda account management failed:", error);
