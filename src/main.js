@@ -856,7 +856,7 @@ async function signIn(email, password) {
 }
 async function signUp(email, password, profile) {
   const result = await authRequest("signup", { email, password, data: profile });
-  if (result.access_token) { saveSession(result); state.user = result.user || null; await enterApp(); }
+  if (result.access_token) { saveSession(result); state.user = result.user || null; await recordLoginEvent("login"); await enterApp(); }
   else authShell("login", "Tài khoản khách hàng đã được tạo. Hãy xác nhận email nếu hệ thống yêu cầu, sau đó đăng nhập để gửi và theo dõi yêu cầu đơn hàng.");
 }
 async function sendPasswordReset(email) {
