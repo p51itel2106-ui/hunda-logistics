@@ -997,7 +997,7 @@ async function signUp(email, password, profile) {
   else authShell("login", "Tài khoản khách hàng đã được tạo. Hãy xác nhận email nếu hệ thống yêu cầu, sau đó đăng nhập để gửi và theo dõi yêu cầu đơn hàng.");
 }
 async function sendPasswordReset(email) {
-  const redirectTo = `${location.origin}${location.pathname}`;
+  const redirectTo = `${String(cfg.siteUrl || location.origin).replace(/\\/$/, "")}/`;
   await authRequest(`recover?redirect_to=${encodeURIComponent(redirectTo)}`, { email });
 }
 async function updatePassword(password) {
