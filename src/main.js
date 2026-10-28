@@ -118,6 +118,17 @@ async function refreshSession() {
   } catch { saveSession(null); return false; }
 }
 async function api(path, options = {}) {
+  if (state.session?.access_token && state.user?.id && !state.accountAccessCheck) {
+    state.accountAccessCheck = true;
+    try {
+      const access = await accountAdminRequest({ action: "check-access" });
+      if (!access.allowed) {
+        saveSession(null); state.user = null; state.isAdmin = false; state.customerAccount = null;
+        authShell("login", "Tài khoản tạm thời bị đình chỉ do sự cố. Vui lòng liên hệ quản trị viên.");
+        throw new Error("Tài khoản tạm thời bị đình chỉ do sự cố.");
+      }
+    } finally { state.accountAccessCheck = false; }
+  }
   let result;
   try { result = await request(`/rest/v1/${path}`, options); }
   catch (error) {
@@ -368,7 +379,7 @@ function customersView() {
   const rows = state.customers.filter(c => [c.name, c.email, c.phone, c.company].join(" ").toLowerCase().includes(state.search));
   const table = !rows.length ? emptyState("users", "Chưa có khách hàng", "Thêm khách hàng để liên kết với đơn hàng.", "new-customer") : `<div class="table-wrap"><table><thead><tr><th>KHÁCH HÀNG</th><th>CÔNG TY</th><th>LIÊN HỆ</th><th>SỐ ĐƠN</th><th>TỔNG GIÁ TRỊ ĐƠN</th><th></th></tr></thead><tbody>${rows.map(c => { const orders = state.orders.filter(o => o.customer_id === c.id); const total = orders.reduce((n, o) => n + Number(o.amount || 0), 0); return `<tr><td><span class="customer-cell">${avatar(c.name)}<span><b>${escapeHTML(c.name)}</b><small class="subline">${escapeHTML(c.email || "")}</small></span></span></td><td>${escapeHTML(c.company || "—")}</td><td>${escapeHTML(c.phone || "—")}</td><td>${orders.length}</td><td><b>${money(total)}</b></td><td><div class="row-actions"><button class="icon-button" data-action="edit-customer" data-id="${c.id}" title="Sửa">${icon("edit", 16)}</button><button class="icon-button danger" data-action="delete-customer" data-id="${c.id}" title="Xóa">${icon("trash", 16)}</button></div></td></tr>`; }).join("")}</tbody></table></div>`;
   const accounts = state.managedAccounts || [];
-  const accountRows = accounts.length ? accounts.map(a => `<tr><td><b>${escapeHTML(a.full_name || "—")}</b><small class="subline">${escapeHTML(a.email || "")}</small></td><td>${escapeHTML(a.company || "—")}</td><td>${escapeHTML(a.phone || "—")}</td><td><span class="pill ${a.role === "admin" ? "in_progress" : "completed"}">${a.role === "admin" ? "Quản trị viên" : "Khách hàng"}</span>${a.role === "admin" ? '<small class="subline">Quyền: ' + escapeHTML(PERMISSION_ITEMS.filter(([key]) => a.permissions?.[key] === true).map(([, label]) => label).join(", ") || "Chưa cấp quyền") + '</small>' : ""}</td>${hasPermission("wallet") ? '<td><b class="wallet-balance">' + money(a.balance) + '</b></td>' : ""}<td><span class="pill ${a.active ? "completed" : "cancelled"}">${a.active ? (a.email_confirmed ? "Đang hoạt động" : "Chưa xác minh email") : "Đã khóa"}</span></td><td>${dateText(a.created_at)}</td><td>${a.role === "customer" ? `${hasPermission("wallet") ? '<button class="btn ghost small" data-action="wallet-adjust" data-id="' + escapeHTML(a.user_id) + '">' + icon("wallet", 14) + ' Điều chỉnh</button>' : "—"}` : "—"}</td></tr>`).join("") : `<tr><td colspan="${hasPermission("wallet") ? 8 : 7}"><div class="empty-compact">Chưa có tài khoản khách hàng hoặc quản trị viên.</div></td></tr>`;
+  const accountRows = accounts.length ? accounts.map(a => `<tr><td><b>${escapeHTML(a.full_name || "—")}</b><small class="subline">${escapeHTML(a.email || "")}</small></td><td>${escapeHTML(a.company || "—")}</td><td>${escapeHTML(a.phone || "—")}</td><td><span class="pill ${a.role === "admin" ? "in_progress" : "completed"}">${a.role === "admin" ? "Quản trị viên" : "Khách hàng"}</span>${a.role === "admin" ? '<small class="subline">Quyền: ' + escapeHTML(PERMISSION_ITEMS.filter(([key]) => a.permissions?.[key] === true).map(([, label]) => label).join(", ") || "Chưa cấp quyền") + '</small>' : ""}</td>${hasPermission("wallet") ? '<td><b class="wallet-balance">' + money(a.balance) + '</b></td>' : ""}<td><span class="pill ${a.active ? "completed" : "cancelled"}">${a.active ? (a.email_confirmed ? "Đang hoạt động" : "Chưa xác minh email") : "Đã khóa"}</span></td><td>${dateText(a.created_at)}</td><td>\${(a.active ? '<button class="btn danger small" data-action="lock-account" data-id="' + escapeHTML(a.user_id) + '">Khóa tài khoản</button>' : '<button class="btn primary small" data-action="unlock-account" data-id="' + escapeHTML(a.user_id) + '">Mở khóa</button>') + (a.role === "customer" && hasPermission("wallet") ? '<button class="btn ghost small" data-action="wallet-adjust" data-id="' + escapeHTML(a.user_id) + '">' + icon("wallet", 14) + ' Điều chỉnh</button>' : '')}</td></tr>`).join("") : `<tr><td colspan="${hasPermission("wallet") ? 8 : 7}"><div class="empty-compact">Chưa có tài khoản khách hàng hoặc quản trị viên.</div></td></tr>`;
   const accountPanel = `<section class="panel table-panel account-access-panel"><div class="panel-heading"><div><h2>Tài khoản truy cập</h2><p>Số dư và vai trò của từng tài khoản.</p></div>${hasPermission("wallet") ? '<button class="btn ghost small" data-action="wallet-settings">' + icon("wallet", 15) + ' Tài khoản nhận tiền</button>' : ""}</div><div class="table-wrap"><table><thead><tr><th>NGƯỜI DÙNG</th><th>CÔNG TY</th><th>ĐIỆN THOẠI</th><th>VAI TRÒ</th>${hasPermission("wallet") ? "<th>SỐ DƯ</th>" : ""}<th>TRẠNG THÁI</th><th>NGÀY TẠO</th><th>THAO TÁC</th></tr></thead><tbody>${accountRows}</tbody></table></div></section>`;
   const requests = state.walletAdmin?.requests || [];
   const walletTab = state.walletAdminTab === "withdrawal" ? "withdrawal" : "deposit";
@@ -695,6 +706,8 @@ function action(actionName, id) {
   if (actionName === "delete-order") return confirmDelete("đơn hàng", id, "orders");
   if (actionName === "new-customer") return customerModal();
   if (actionName === "new-account") return managedAccountModal();
+  if (actionName === "lock-account") return setManagedAccountStatus(id, false);
+  if (actionName === "unlock-account") return setManagedAccountStatus(id, true);
   if (actionName === "wallet-deposit") return walletTransactionModal("deposit");
   if (actionName === "wallet-withdraw") return walletTransactionModal("withdrawal");
   if (actionName === "wallet-history-tab") { state.walletAdminTab = id === "withdrawal" ? "withdrawal" : "deposit"; render(); return; }
@@ -917,6 +930,16 @@ async function confirmDelete(label, id, table) {
   try { await api(`${table}?id=eq.${id}`, { method: "DELETE" }); await loadData(); render(); showToast(`Đã xóa ${label}.`); } catch (error) { fail(error); }
 }
 
+async function setManagedAccountStatus(userId, active) {
+  const account = state.managedAccounts.find(item => item.user_id === userId);
+  if (!account) return showToast("Không tìm thấy tài khoản.", "error");
+  const verb = active ? "mở khóa" : "khóa";
+  if (!confirm("Bạn có chắc muốn " + verb + " tài khoản " + account.email + "?")) return;
+  try {
+    await accountAdminRequest({ action: "set-status", user_id: userId, role: account.role, active });
+    await loadData(); render(); showToast(active ? "Đã mở khóa tài khoản và ghi nhật ký thao tác." : "Đã khóa tài khoản và ghi nhật ký thao tác.");
+  } catch (error) { fail(error); }
+}
 async function loadData() {
   if (!state.session) return;
   const canDashboard = hasPermission("dashboard");
