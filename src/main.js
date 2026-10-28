@@ -14,12 +14,13 @@ const PERMISSION_ITEMS = [
   ["quotes", "Báo giá", "Xem yêu cầu và duyệt/chốt báo giá"],
   ["activity", "Nhật ký thao tác", "Xem lịch sử thao tác hệ thống"],
   ["accounts", "Quản lý tài khoản", "Cấp tài khoản và xem danh sách tài khoản"],
-  ["wallet", "Quản lý ví", "Duyệt nạp/rút và điều chỉnh số dư"]
+  ["wallet", "Quản lý ví", "Duyệt nạp/rút và điều chỉnh số dư"],
+  ["security", "Giám sát đăng nhập", "Xem IP, thiết bị và lịch sử đăng nhập tài khoản"]
 ];
 const ALL_PERMISSIONS = Object.fromEntries(PERMISSION_ITEMS.map(([key]) => [key, true]));
 const hasPermission = key => state.permissions?.[key] === true;
 const requirePermission = key => { if (!hasPermission(key)) { showToast("Tài khoản của bạn chưa được cấp quyền cho chức năng này.", "error"); return false; } return true; };
-const state = { page: "dashboard", workspace: "admin", isAdmin: false, permissions: {}, customerAccount: null, customerAccounts: [], managedAccounts: [], wallet: null, walletAdmin: null, walletAdminTab: "deposit", session: readSession(), user: null, customers: [], orders: [], customerOrders: [], transactions: [], transactionFilter: "all", documents: [], quotes: [], quoteImageUrls: {}, quoteDraft: { actual: "0", cbm: "0", convert: false, marketplace: "taobao", productUrl: "", productSku: "", productQuantity: "1", productNote: "", dirty: false }, activity: [], customerPage: "management", search: "", month: new Date().toISOString().slice(0, 7), realtime: null };
+const state = { page: "dashboard", loginEvents: [], workspace: "admin", isAdmin: false, permissions: {}, customerAccount: null, customerAccounts: [], managedAccounts: [], wallet: null, walletAdmin: null, walletAdminTab: "deposit", session: readSession(), user: null, customers: [], orders: [], customerOrders: [], transactions: [], transactionFilter: "all", documents: [], quotes: [], quoteImageUrls: {}, quoteDraft: { actual: "0", cbm: "0", convert: false, marketplace: "taobao", productUrl: "", productSku: "", productQuantity: "1", productNote: "", dirty: false }, activity: [], customerPage: "management", search: "", month: new Date().toISOString().slice(0, 7), realtime: null };
 
 const walletPaymentTimers = new Map();
 
@@ -63,6 +64,8 @@ function saveSession(session) { state.session = session; session ? localStorage.
 function headers(extra = {}) { return { apikey: PUBLIC_KEY, Authorization: `Bearer ${state.session?.access_token || PUBLIC_KEY}`, ...extra }; }
 async function accountAdminRequest(payload) { return request("/functions/v1/hunda-admin-accounts", { method: "POST", body: JSON.stringify(payload) }); }
 async function walletRequest(payload) { return request("/functions/v1/hunda-wallet", { method: "POST", body: JSON.stringify(payload) }); }
+async function loginAuditRequest(payload) { return request("/functions/v1/hunda-login-audit", { method: "POST", body: JSON.stringify(payload) }); }
+async function recordLoginEvent(action) { try { if (state.session?.access_token) await loginAuditRequest({ action }); } catch (error) { console.warn("Login audit event was not recorded:", error?.message || error); } }
 async function loadWalletSnapshot() { state.wallet = await walletRequest({ action: "snapshot" }); return state.wallet; }
 async function request(path, options = {}, auth = true) {
   const isBinary = typeof Blob !== "undefined" && options.body instanceof Blob;
@@ -121,9 +124,9 @@ function renderPending(email) {
 }
 
 const pages = [
-  ["dashboard", "Tổng quan", "grid"], ["orders", "Đơn hàng", "box"], ["customers", "Khách hàng", "users"], ["transactions", "Thu chi", "wallet"], ["reports", "Báo cáo tài chính", "chart"], ["documents", "Chứng từ", "file"], ["quotes", "Báo giá", "file"], ["activity", "Nhật ký thao tác", "clock"]
+  ["dashboard", "Tổng quan", "grid"], ["orders", "Đơn hàng", "box"], ["customers", "Khách hàng", "users"], ["transactions", "Thu chi", "wallet"], ["reports", "Báo cáo tài chính", "chart"], ["documents", "Chứng từ", "file"], ["quotes", "Báo giá", "file"], ["activity", "Nhật ký thao tác", "clock"], ["security", "Giám sát đăng nhập", "shield"]
 ];
-const pageTitles = { dashboard: ["Tổng quan", "Theo dõi hoạt động và dòng tiền của Hunda Logistics."], orders: ["Đơn hàng", "Quản lý vận chuyển từ lúc tiếp nhận đến khi hoàn tất."], customers: ["Khách hàng", "Lưu thông tin và theo dõi lịch sử hợp tác."], transactions: ["Thu chi", "Ghi nhận các khoản thu, chi và trạng thái thanh toán."], reports: ["Báo cáo tài chính", "Dòng tiền và kết quả theo các giao dịch đã xác nhận."], documents: ["Chứng từ", "Tệp đính kèm được lưu trong kho riêng tư trên máy chủ."], quotes: ["Báo giá", "Duyệt yêu cầu và chốt giá cuối cùng gửi cho khách hàng."], activity: ["Nhật ký thao tác", "Theo dõi thay đổi đơn hàng, khách hàng, thu chi và chứng từ."] };
+const pageTitles = { dashboard: ["Tổng quan", "Theo dõi hoạt động và dòng tiền của Hunda Logistics."], orders: ["Đơn hàng", "Quản lý vận chuyển từ lúc tiếp nhận đến khi hoàn tất."], customers: ["Khách hàng", "Lưu thông tin và theo dõi lịch sử hợp tác."], transactions: ["Thu chi", "Ghi nhận các khoản thu, chi và trạng thái thanh toán."], reports: ["Báo cáo tài chính", "Dòng tiền và kết quả theo các giao dịch đã xác nhận."], documents: ["Chứng từ", "Tệp đính kèm được lưu trong kho riêng tư trên máy chủ."], quotes: ["Báo giá", "Duyệt yêu cầu và chốt giá cuối cùng gửi cho khách hàng."], activity: ["Nhật ký thao tác", "Theo dõi thay đổi đơn hàng, khách hàng, thu chi và chứng từ."], security: ["Giám sát đăng nhập", "Theo dõi địa chỉ IP, thiết bị và thời điểm đăng nhập của các tài khoản."] };
 
 function shell(content) {
   const [title, subtitle] = pageTitles[state.page];
@@ -162,6 +165,7 @@ function render() {
   if (state.page === "transactions") return shell(transactionsView());
   if (state.page === "reports") return shell(reportsView());
   if (state.page === "activity") return shell(activityView());
+  if (state.page === "security") return shell(securityView());
   if (state.page === "quotes") return shell(quotesView());
   return shell(documentsView());
 }
@@ -536,6 +540,16 @@ function activityView() {
   }).join("") : `<tr><td colspan="6"><div class="empty-compact">Chưa có thay đổi nào được ghi nhận.</div></td></tr>`;
   return `<div class="activity-note"><span class="activity-live-dot"></span><div><b>Nhật ký đồng bộ trực tiếp</b><span>Ghi nhận trên máy chủ, sắp xếp mới nhất trước. Giờ hiển thị theo Việt Nam (UTC+7).</span></div><button class="btn ghost small" data-action="refresh">${icon("refresh", 15)} Làm mới</button></div><section class="panel table-panel"><div class="table-toolbar"><div class="activity-count">${rows.length} hoạt động gần nhất</div><span class="activity-retention">Theo dõi đơn hàng · khách hàng · thu chi · chứng từ</span></div><div class="table-wrap"><table class="activity-table"><thead><tr><th>THỜI GIAN</th><th>NGƯỜI THAO TÁC</th><th>HÀNH ĐỘNG / TRƯỜNG THAY ĐỔI</th><th>ĐỐI TƯỢNG</th><th>ĐỊA CHỈ IP</th><th>THIẾT BỊ</th></tr></thead><tbody>${rowsHtml}</tbody></table></div></section>`;
 }
+function securityView() {
+  const events = state.loginEvents || [];
+  const filtered = events.filter(e => {
+    const q = (state.search || "").trim().toLowerCase();
+    return !q || [e.email, e.ip_address, e.device_type, e.browser, e.os, e.role, e.event_type].some(v => String(v || "").toLowerCase().includes(q));
+  });
+  const fmt = value => value ? new Intl.DateTimeFormat("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }).format(new Date(value)) : "—";
+  const rows = filtered.length ? filtered.map(e => `<tr><td><b>${escapeHTML(fmt(e.occurred_at))}</b><small class="subline">UTC+7 · Việt Nam</small></td><td><b>${escapeHTML(e.email || "—")}</b><small class="subline">${e.role === "admin" ? "Quản trị viên" : e.role === "customer" ? "Khách hàng" : "Chưa xác định"}</small></td><td><span class="activity-action ${e.event_type === "login" ? "created" : "updated"}">${e.event_type === "login" ? "Đăng nhập" : "Đăng xuất"}</span></td><td><b>${escapeHTML(e.ip_address || "Không nhận được IP")}</b></td><td><b>${escapeHTML(e.device_type || "Không rõ")}</b><small class="subline">${escapeHTML([e.os, e.browser].filter(Boolean).join(" · ") || "Không rõ hệ điều hành/trình duyệt")}</small></td></tr>`).join("") : `<tr><td colspan="5"><div class="empty-compact">Chưa có sự kiện đăng nhập được ghi nhận.</div></td></tr>`;
+  return `<div class="activity-note"><span class="activity-live-dot"></span><div><b>Giám sát đăng nhập</b><span>Ghi nhận đăng nhập thành công và đăng xuất; địa chỉ IP được lấy từ header do máy chủ biên cung cấp khi có sẵn.</span></div><button class="btn ghost small" data-action="refresh">${icon("refresh", 15)} Làm mới</button></div><section class="panel table-panel"><div class="table-toolbar"><div class="activity-count">${filtered.length} sự kiện</div><span class="activity-retention">Tối đa 300 sự kiện gần nhất được tải</span><label class="table-search">${icon("search", 16)}<input id="search" placeholder="Tìm email, IP, thiết bị..." value="${escapeHTML(state.search)}" /></label></div><div class="table-wrap"><table class="activity-table"><thead><tr><th>THỜI GIAN</th><th>TÀI KHOẢN</th><th>SỰ KIỆN</th><th>ĐỊA CHỈ IP</th><th>THIẾT BỊ / TRÌNH DUYỆT</th></tr></thead><tbody>${rows}</tbody></table></div></section><p class="muted security-footnote">Lưu ý: IP có thể thay đổi khi dùng VPN hoặc mạng di động. Thiết bị/trình duyệt được suy ra từ User-Agent, không phải mã định danh phần cứng. Phiên bản này chưa ghi nhận đăng nhập thất bại.</p>`;
+}
 function formatSize(bytes = 0) { if (bytes < 1024) return `${bytes} B`; if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`; return `${(bytes / (1024 * 1024)).toFixed(1)} MB`; }
 function avatar(name = "?") { const colors = ["mint", "peach", "lavender", "sky", "butter"]; const n = Array.from(name).reduce((a, c) => a + c.charCodeAt(0), 0); return `<i class="avatar ${colors[n % colors.length]}">${escapeHTML(name.trim().slice(0, 1).toUpperCase())}</i>`; }
 function statusPill(value, type) {
@@ -792,7 +806,7 @@ async function confirmDelete(label, id, table) {
 async function loadData() {
   if (!state.session) return;
   const canDashboard = hasPermission("dashboard");
-  const [customers, orders, transactions, documents, activity, customerAccounts, quotes, managedAccounts, walletAdmin] = await Promise.all([
+  const [customers, orders, transactions, documents, activity, customerAccounts, quotes, managedAccounts, walletAdmin, loginAudit] = await Promise.all([
     hasPermission("customers") ? api("customers?select=*&order=created_at.desc") : Promise.resolve([]),
     hasPermission("orders") || canDashboard ? api("orders?select=*,customer:customers(name)&order=created_at.desc") : Promise.resolve([]),
     hasPermission("transactions") || hasPermission("reports") || canDashboard ? api("transactions?select=*,customer:customers(name),order:orders(code)&order=transaction_date.desc,created_at.desc") : Promise.resolve([]),
@@ -801,7 +815,8 @@ async function loadData() {
     hasPermission("accounts") ? api("customer_accounts?select=user_id,customer_id,full_name&order=created_at.desc") : Promise.resolve([]),
     hasPermission("quotes") ? api("customer_quotes?select=*&order=created_at.desc") : Promise.resolve([]),
     hasPermission("accounts") ? accountAdminRequest({ action: "list" }) : Promise.resolve({ accounts: [] }),
-    hasPermission("wallet") ? walletRequest({ action: "admin-list" }) : Promise.resolve({ requests: [], bank: null })
+    hasPermission("wallet") ? walletRequest({ action: "admin-list" }) : Promise.resolve({ requests: [], bank: null }),
+    hasPermission("security") ? loginAuditRequest({ action: "list", limit: 300 }).catch(() => ({ events: [] })) : Promise.resolve({ events: [] })
   ]);
   state.customers = customers || [];
   state.orders = orders || [];
@@ -813,6 +828,7 @@ async function loadData() {
   await loadQuoteImageUrls(state.quotes);
   state.managedAccounts = managedAccounts?.accounts || [];
   state.walletAdmin = walletAdmin || { requests: [], bank: null };
+  state.loginEvents = loginAudit?.events || [];
 }
 function startRealtime() {
   if (state.realtime || !window.supabase?.createClient || !state.session?.access_token) return;
@@ -835,6 +851,7 @@ async function checkAdmin() {
 async function authRequest(route, body) { return request(`/auth/v1/${route}`, { method: "POST", body: JSON.stringify(body) }, false); }
 async function signIn(email, password) {
   const session = await authRequest("token?grant_type=password", { email, password }); saveSession(session); state.user = session.user || null;
+  await recordLoginEvent("login");
   await enterApp();
 }
 async function signUp(email, password, profile) {
@@ -852,6 +869,7 @@ async function updatePassword(password) {
   authShell("login", "Mật khẩu đã được cập nhật. Hãy đăng nhập bằng mật khẩu mới.");
 }
 async function signOut() {
+  await recordLoginEvent("logout");
   if (state.realtime) { try { await state.realtime.unsubscribe(); } catch {} state.realtime = null; }
   try { if (state.session?.access_token) await request("/auth/v1/logout", { method: "POST" }); } catch { /* Local sign-out still completes when the server session expired. */ }
   saveSession(null); state.user = null; state.workspace = "admin"; state.isAdmin = false; state.customerAccount = null; state.customerAccounts = []; state.customers = []; state.orders = []; state.customerOrders = []; state.transactions = []; state.documents = []; state.activity = []; state.wallet = null; state.walletAdmin = null; state.managedAccounts = []; authShell("login");
