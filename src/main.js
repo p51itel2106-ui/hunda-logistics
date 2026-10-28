@@ -24,7 +24,7 @@ const PERMISSION_ITEMS = [
 const ALL_PERMISSIONS = Object.fromEntries(PERMISSION_ITEMS.map(([key]) => [key, true]));
 const hasPermission = key => state.permissions?.[key] === true;
 const requirePermission = key => { if (!hasPermission(key)) { showToast("Tài khoản của bạn chưa được cấp quyền cho chức năng này.", "error"); return false; } return true; };
-const state = { page: "dashboard", loginEvents: [], workspace: "admin", isAdmin: false, permissions: {}, customerAccount: null, customerAccounts: [], managedAccounts: [], wallet: null, walletAdmin: null, walletAdminTab: "deposit", session: readSession(), user: null, customers: [], orders: [], customerOrders: [], transactions: [], transactionFilter: "all", documents: [], quotes: [], quoteImageUrls: {}, quoteDraft: { actual: "0", cbm: "0", convert: false, marketplace: "taobao", productUrl: "", productSku: "", productQuantity: "1", productNote: "", dirty: false }, activity: [], customerPage: "management", search: "", month: new Date().toISOString().slice(0, 7), realtime: null };
+const state = { page: "dashboard", loginEvents: [], workspace: "admin", isAdmin: false, permissions: {}, customerAccount: null, customerAccounts: [], managedAccounts: [], wallet: null, walletAdmin: null, walletAdminTab: "deposit", session: readSession(), user: null, customers: [], orders: [], customerOrders: [], transactions: [], transactionFilter: "all", documents: [], quotes: [], quoteImageUrls: {}, quoteDraft: { actual: "0", cbm: "0", convert: false, marketplace: "taobao", productUrl: "", productSku: "", productQuantity: "1", productNote: "", dirty: false }, activity: [], customerPage: "management", search: "", month: new Date().toISOString().slice(0, 7), reportMode: "month", realtime: null };
 
 const walletPaymentTimers = new Map();
 
@@ -176,7 +176,7 @@ function pageAction() {
   if (state.page === "documents") return `${hasPermission("documents") ? `<button class="btn primary" data-action="new-document">${icon("upload", 17)} Tải chứng từ</button>` : ""}`;
   if (state.page === "quotes") return hasPermission("quotes") ? '<button class="btn ghost" data-action="refresh">' + icon("refresh", 16) + ' Làm mới yêu cầu</button>' : "";
   if (state.page === "activity") return `<span class="live-badge ${state.realtimeStatus === "SUBSCRIBED" ? "connected" : ""}"><i></i>${state.realtimeStatus === "SUBSCRIBED" ? "Đang đồng bộ trực tiếp" : "Đang kết nối · làm mới dự phòng"} · UTC+7</span>`;
-  if (state.page === "reports") return `<label class="month-control">${icon("calendar", 16)}<input type="month" id="report-month" value="${state.month}" /></label>`;
+  if (state.page === "reports") return `<div class="report-period-control"><button class="btn ${state.reportMode === "month" ? "primary" : "ghost"}" data-action="report-month-mode">Theo tháng</button><button class="btn ${state.reportMode === "year" ? "primary" : "ghost"}" data-action="report-year-mode">Theo năm</button>${state.reportMode === "month" ? `<label class="month-control">${icon("calendar", 16)}<input type="month" id="report-month" value="${state.month}" /></label>` : `<label class="month-control">${icon("calendar", 16)}<input type="number" id="report-year" min="2000" max="2100" value="${Number(state.month.slice(0, 4))}" aria-label="Năm báo cáo" /></label>`}</div>`;
   return `<button class="btn ghost" data-page="orders">${icon("box", 16)} Xem đơn hàng</button>`;
 }
 function bindShell() {
@@ -187,6 +187,9 @@ function bindShell() {
   document.querySelector("#close-sidebar")?.addEventListener("click", closeNav);
   document.querySelector("#sidebar-scrim")?.addEventListener("click", closeNav);
   document.querySelector("#report-month")?.addEventListener("change", e => { state.month = e.target.value; render(); });
+  document.querySelector("#report-year")?.addEventListener("change", e => { const year = Math.min(2100, Math.max(2000, Number(e.target.value) || new Date().getFullYear())); state.month = `${year}-01`; render(); });
+  document.querySelector('[data-action="report-month-mode"]')?.addEventListener("click", () => { state.reportMode = "month"; render(); });
+  document.querySelector('[data-action="report-year-mode"]')?.addEventListener("click", () => { state.reportMode = "year"; render(); });
   document.querySelector("#transaction-source-filter")?.addEventListener("change", e => { state.transactionFilter = e.target.value; render(); });
   document.querySelector("#search")?.addEventListener("input", e => { state.search = e.target.value.toLowerCase(); const pos = e.target.selectionStart; render(); const next = document.querySelector("#search"); next?.focus(); next?.setSelectionRange(pos, pos); });
 }
@@ -374,7 +377,34 @@ function transactionsView() {
   const sourceFilter = `<label class="form-field transaction-source-filter"><span>Phân loại</span><select id="transaction-source-filter"><option value="all" ${state.transactionFilter === "all" ? "selected" : ""}>Tất cả khoản thu chi</option><option value="customer_order_payment" ${state.transactionFilter === "customer_order_payment" ? "selected" : ""}>Khách thanh toán đơn</option><option value="customer_withdrawal" ${state.transactionFilter === "customer_withdrawal" ? "selected" : ""}>Khách hàng rút</option><option value="admin_withdrawal" ${state.transactionFilter === "admin_withdrawal" ? "selected" : ""}>Quản trị rút</option><option value="other" ${state.transactionFilter === "other" ? "selected" : ""}>Thu chi khác</option></select></label>`;
   return `<div class="mini-summary"><div><span>Tổng thu đã xác nhận</span><b class="amount-in">${money(income)}</b></div><div><span>Tổng chi đã xác nhận</span><b class="amount-out">${money(expense)}</b></div><div><span>Số giao dịch</span><b>${rows.length}</b></div></div><section class="panel table-panel">${toolbar("Tìm nội dung, mã đơn, khách hàng...")}${sourceFilter}${table}</section>`;
 }
+function reportsAnnualView() {
+  const year = Number(state.month.slice(0, 4));
+  const yearPrefix = String(year);
+  const months = Array.from({ length: 12 }, (_, i) => `${yearPrefix}-${String(i + 1).padStart(2, "0")}`);
+  const paidRows = state.transactions.filter(t => t.status === "paid" && String(t.transaction_date).slice(0, 4) === yearPrefix);
+  const monthRows = months.map(month => {
+    const tx = paidRows.filter(t => String(t.transaction_date).slice(0, 7) === month);
+    const income = tx.filter(t => t.direction === "income").reduce((n, t) => n + Number(t.amount || 0), 0);
+    const operatingExpense = tx.filter(t => t.direction === "expense" && t.source_type !== "customer_withdrawal" && t.source_type !== "admin_withdrawal").reduce((n, t) => n + Number(t.amount || 0), 0);
+    const withdrawals = tx.filter(t => t.source_type === "customer_withdrawal").reduce((n, t) => n + Number(t.amount || 0), 0);
+    const orders = state.orders.filter(o => o.status !== "cancelled" && o.created_at && new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Ho_Chi_Minh", year: "numeric", month: "2-digit" }).format(new Date(o.created_at)) === month);
+    const revenue = orders.reduce((n, o) => n + Number(o.amount || 0), 0);
+    const expectedCost = orders.reduce((n, o) => n + Number(o.expected_cost || 0), 0);
+    return { month, income, operatingExpense, withdrawals, profit: income - operatingExpense, revenue, expectedCost, expectedProfit: revenue - expectedCost };
+  });
+  const sum = key => monthRows.reduce((n, m) => n + m[key], 0);
+  const table = `<div class="table-wrap"><table><thead><tr><th>THÁNG</th><th>DOANH THU ĐƠN</th><th>TIỀN ĐÃ THU</th><th>CHI PHÍ NGHIỆP VỤ</th><th>KHÁCH RÚT</th><th>LỢI NHUẬN THU/CHI</th><th>LỢI NHUẬN DỰ KIẾN</th></tr></thead><tbody>${monthRows.map(m => `<tr><td><b>${escapeHTML(m.month)}</b></td><td>${money(m.revenue)}</td><td class="amount-in">${money(m.income)}</td><td class="amount-out">${money(m.operatingExpense)}</td><td class="amount-out">${money(m.withdrawals)}</td><td class="${m.profit < 0 ? "negative" : "amount-in"}">${money(m.profit)}</td><td class="${m.expectedProfit < 0 ? "negative" : ""}">${money(m.expectedProfit)}</td></tr>`).join("")}</tbody><tfoot><tr><th>CẢ NĂM ${year}</th><th>${money(sum("revenue"))}</th><th class="amount-in">${money(sum("income"))}</th><th class="amount-out">${money(sum("operatingExpense"))}</th><th class="amount-out">${money(sum("withdrawals"))}</th><th class="${sum("profit") < 0 ? "negative" : "amount-in"}">${money(sum("profit"))}</th><th>${money(sum("expectedProfit"))}</th></tr></tfoot></table></div>`;
+  return `<div class="report-summary">
+    <article class="report-card"><span>Doanh thu đơn hàng cả năm</span><b class="amount-in">${money(sum("revenue"))}</b><small>Đơn không bị hủy trong năm ${year}</small></article>
+    <article class="report-card"><span>Chi phí nghiệp vụ thực tế</span><b class="amount-out">${money(sum("operatingExpense"))}</b><small>Không bao gồm khách hàng rút tiền</small></article>
+    <article class="report-card emphasis"><span>Lợi nhuận thu/chi nghiệp vụ</span><b class="${sum("profit") < 0 ? "negative" : ""}">${money(sum("profit"))}</b><small>Tiền thu đã xác nhận trừ chi phí nghiệp vụ</small></article>
+    <article class="report-card"><span>Khách hàng rút tiền</span><b class="amount-out">${money(sum("withdrawals"))}</b><small>Dòng tiền riêng, không tính là chi phí kinh doanh</small></article>
+    <article class="report-card"><span>Tiền đã thu</span><b class="amount-in">${money(sum("income"))}</b><small>Tổng giao dịch thu đã xác nhận trong năm</small></article>
+    <article class="report-card emphasis"><span>Lợi nhuận dự kiến theo đơn</span><b class="${sum("expectedProfit") < 0 ? "negative" : ""}">${money(sum("expectedProfit"))}</b><small>Doanh thu đơn hàng trừ chi phí dự kiến</small></article>
+  </div><section class="panel table-panel"><div class="panel-heading"><div><h2>Báo cáo chi tiết 12 tháng · ${year}</h2><p>Đối chiếu doanh thu, thu chi thực tế và khoản khách rút</p></div></div>${table}</section><div class="report-footnote">Báo cáo năm tổng hợp từ tháng 01 đến tháng 12 của năm được chọn. Lợi nhuận thu/chi nghiệp vụ = tiền thu đã xác nhận − chi phí nghiệp vụ đã xác nhận; khoản khách hàng rút tiền được trình bày riêng và không làm giảm lợi nhuận. Lợi nhuận dự kiến theo đơn dựa trên chi phí dự kiến đã nhập.</div>`;
+}
 function reportsView() {
+  if (state.reportMode === "year") return reportsAnnualView();
   const rows = state.transactions.filter(t => String(t.transaction_date).slice(0, 7) === state.month);
   const paidRows = rows.filter(t => t.status === "paid");
   const receipts = paidRows.filter(t => t.direction === "income").reduce((n, t) => n + Number(t.amount || 0), 0);
