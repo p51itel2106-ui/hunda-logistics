@@ -52,16 +52,19 @@ Deno.serve(async (req: Request) => {
 
     const body = await req.json();
     if (body?.action === "list") {
-      const [{ data: adminRows, error: adminError }, { data: profileRows, error: profileError }, { data: walletRows, error: walletError }, { data: usersResult, error: usersError }] = await Promise.all([
+      const [{ data: adminRows, error: adminError }, { data: profileRows, error: profileError }, walletResult, { data: usersResult, error: usersError }] = await Promise.all([
         adminClient.from("admin_users").select("user_id,email,active,permissions,created_at"),
         adminClient.from("customer_accounts").select("user_id,customer_id,full_name,phone,billing_company,created_at"),
-        adminClient.from("user_wallets").select("user_id,balance"),
+        grantedPermissions.wallet === true
+          ? adminClient.from("user_wallets").select("user_id,balance")
+          : Promise.resolve({ data: [], error: null }),
         adminClient.auth.admin.listUsers({ page: 1, perPage: 1000 }),
       ]);
       if (adminError) throw adminError;
       if (profileError) throw profileError;
-      if (walletError) throw walletError;
+      if (walletResult.error) throw walletResult.error;
       if (usersError) throw usersError;
+      const walletRows = walletResult.data || [];
 
       const admins = new Map((adminRows || []).map((row) => [row.user_id, row]));
       const profiles = new Map((profileRows || []).map((row) => [row.user_id, row]));
@@ -98,7 +101,11 @@ Deno.serve(async (req: Request) => {
     const password = String(account.password || "");
     const role = account.role;
     const permissionKeys = ["dashboard", "orders", "customers", "transactions", "reports", "documents", "quotes", "activity", "accounts", "wallet", "security"];
-    const permissions = role === "admin" ? Object.fromEntries(permissionKeys.map((key) => [key, account.permissions?.[key] === true])) : {};
+    // A delegated administrator may only grant permissions they personally hold.
+    // This prevents an accounts-only operator from escalating a new account to wallet/security access.
+    const permissions = role === "admin"
+      ? Object.fromEntries(permissionKeys.map((key) => [key, grantedPermissions[key] === true && account.permissions?.[key] === true]))
+      : {};
 
     if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) return json({ error: "Email chưa đúng định dạng." }, 400);
     if (!fullName) return json({ error: "Vui lòng nhập họ và tên." }, 400);
