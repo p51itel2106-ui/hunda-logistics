@@ -97,7 +97,7 @@ Deno.serve(async (req: Request) => {
     const company = String(account.company || "").trim();
     const password = String(account.password || "");
     const role = account.role;
-    const permissionKeys = ["dashboard", "orders", "customers", "transactions", "reports", "documents", "quotes", "activity", "accounts", "wallet"];
+    const permissionKeys = ["dashboard", "orders", "customers", "transactions", "reports", "documents", "quotes", "activity", "accounts", "wallet", "security"];
     const permissions = role === "admin" ? Object.fromEntries(permissionKeys.map((key) => [key, account.permissions?.[key] === true])) : {};
 
     if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) return json({ error: "Email chưa đúng định dạng." }, 400);
