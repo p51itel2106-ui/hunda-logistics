@@ -377,3 +377,13 @@ body{background:var(--canvas)}
 .wallet-payment-result p{max-width:340px;margin:0;color:#68766e;font-size:12px;line-height:1.6}
 .wallet-payment-result>strong{color:#176b4b;font:800 24px Manrope,sans-serif}
 .wallet-payment-result>small{color:#7b8880;font-size:10px}
+
+
+/* Granular administrator permissions */
+.permission-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin:4px 0 10px}
+.permission-option{display:flex;align-items:flex-start;gap:10px;padding:11px 12px;border:1px solid #dce6df;border-radius:10px;background:#fbfdfb;cursor:pointer;min-width:0}
+.permission-option input{width:16px;height:16px;flex:none;margin:2px 0 0;accent-color:#176b4b}
+.permission-option span{display:grid;gap:3px;min-width:0}
+.permission-option b{color:#173b2e;font-size:12px}
+.permission-option small{color:#6b7b71;font-size:10px;line-height:1.45}
+@media(max-width:600px){.permission-grid{grid-template-columns:1fr}}
