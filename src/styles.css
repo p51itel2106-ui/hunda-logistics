@@ -416,3 +416,11 @@ body{background:var(--canvas)}
 .customer-nav-child:hover{color:#fff;background:rgba(255,255,255,.06)}
 .customer-nav-child.active{color:#effff4;background:#174a37;font-weight:600}
 
+
+.account-row-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px;white-space:nowrap}
+.account-status-toggle{min-width:94px;border:1px solid transparent}
+.account-status-active{background:#eaf4ec;color:#28764b}
+.account-status-active:hover{background:#dcefe1}
+.account-status-locked{background:#f2eeee;color:#8f514a}
+.account-status-locked:hover{background:#f8e7e4}
+.wallet-adjust-button{min-width:142px}
