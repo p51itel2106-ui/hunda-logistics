@@ -692,9 +692,15 @@ async function reviewWalletTransaction(id, approve) {
   } catch (error) { fail(error); }
 }
 function managedAccountModal() {
-  const roles = `<option value="customer" selected>Khách hàng — chỉ xem hồ sơ và đơn hàng của mình</option><option value="admin">Quản trị viên — quản lý toàn bộ hệ thống</option>`;
-  const fields = `${selectInput("role", "Vai trò truy cập", roles, "customer", true)}${textInput("full_name", "Họ và tên", "", "Nguyễn Văn An", "text", true)}${textInput("email", "Email đăng nhập", "", "email@congty.vn", "email", true)}${textInput("phone", "Số điện thoại", "", "09xx xxx xxx", "tel")}${textInput("company", "Tên công ty", "", "Tên doanh nghiệp")}${textInput("password", "Mật khẩu khởi tạo", "", "Tối thiểu 8 ký tự", "password", true)}${field("Phân quyền", `<p class="form-hint">Quản trị viên được quản lý toàn bộ dữ liệu vận hành. Khách hàng chỉ truy cập hồ sơ và đơn hàng của mình.</p>`, true)}`;
+  const roles = `<option value="customer" selected>Khách hàng — chỉ xem hồ sơ và đơn hàng của mình</option><option value="admin">Quản trị viên — phân quyền theo tính năng</option>`;
+  const permissionFields = PERMISSION_ITEMS.map(([key, label, desc]) => `<label class="permission-option"><input type="checkbox" name="permission_${key}" /><span><b>${label}</b><small>${desc}</small></span></label>`).join("");
+  const fields = `${selectInput("role", "Vai trò truy cập", roles, "customer", true)}${textInput("full_name", "Họ và tên", "", "Nguyễn Văn An", "text", true)}${textInput("email", "Email đăng nhập", "", "email@congty.vn", "email", true)}${textInput("phone", "Số điện thoại", "", "09xx xxx xxx", "tel")}${textInput("company", "Tên công ty", "", "Tên doanh nghiệp")}${textInput("password", "Mật khẩu khởi tạo", "", "Tối thiểu 8 ký tự", "password", true)}${field("Phân quyền chức năng", `<div class="permission-grid" id="admin-permission-grid">${permissionFields}</div><p class="form-hint">Chỉ tích chọn các chức năng tài khoản này thực sự cần sử dụng. Quyền được lưu cùng tài khoản quản trị.</p>`, true)}`;
   openModal("Cấp tài khoản truy cập", formShell("managed-account", "", fields), "Tạo tài khoản");
+  const roleSelect = document.querySelector('#record-form select[name="role"]');
+  const permissionField = document.querySelector("#admin-permission-grid")?.closest(".form-field");
+  const togglePermissions = () => { if (permissionField) permissionField.hidden = roleSelect?.value !== "admin"; };
+  roleSelect?.addEventListener("change", togglePermissions);
+  togglePermissions();
 }
 function customerModal(customer) {
   const fields = `${textInput("name", "Tên khách hàng", customer?.name || "", "Họ tên hoặc tên doanh nghiệp", "text", true)}${textInput("company", "Tên công ty", customer?.company || "", "Tên doanh nghiệp")}${textInput("phone", "Số điện thoại", customer?.phone || "", "090...", "tel")}${textInput("email", "Email", customer?.email || "", "email@company.vn", "email")}${textareaInput("note", "Ghi chú", customer?.note || "", "Địa chỉ, mã số thuế...")}`;
@@ -728,7 +734,10 @@ async function handleRecordSubmit(e) {
       if (!result?.transaction_id) throw new Error("Máy chủ chưa tiếp nhận yêu cầu.");
       if (kind === "wallet-deposit") { if (!result.qr_url || !result.transfer_code) throw new Error("Chưa thể tạo QR. Hãy kiểm tra mã ngân hàng VietQR trong cấu hình nhận tiền."); walletPayment = result; } else { if (!result.transfer_code) throw new Error("Máy chủ chưa tạo mã cho lệnh rút."); withdrawalCode = result.transfer_code; }
     } else if (kind === "managed-account") {
-      const result = await accountAdminRequest({ action: "create", account: { role: String(data.get("role")), full_name: String(data.get("full_name") || "").trim(), email: String(data.get("email") || "").trim(), phone: String(data.get("phone") || "").trim(), company: String(data.get("company") || "").trim(), password: String(data.get("password") || "") } });
+      const role = String(data.get("role"));
+      const permissions = Object.fromEntries(PERMISSION_ITEMS.map(([key]) => [key, data.get("permission_" + key) === "on"]));
+      if (role === "admin" && !Object.values(permissions).some(Boolean)) throw new Error("Hãy chọn ít nhất một chức năng cho quản trị viên.");
+      const result = await accountAdminRequest({ action: "create", account: { role, permissions, full_name: String(data.get("full_name") || "").trim(), email: String(data.get("email") || "").trim(), phone: String(data.get("phone") || "").trim(), company: String(data.get("company") || "").trim(), password: String(data.get("password") || "") } });
       if (!result?.account?.user_id) throw new Error("Máy chủ chưa xác nhận tài khoản mới.");
     } else if (kind === "document") await uploadDocument(data);
     else if (kind === "customer-order") {
