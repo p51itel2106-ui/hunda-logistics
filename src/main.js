@@ -418,6 +418,7 @@ function reportsRangeView() {
   return `<div class="report-summary"><article class="report-card"><span>Doanh thu đơn hàng</span><b class="amount-in">${money(revenue)}</b><small>${orders.length} đơn không bị hủy</small></article><article class="report-card"><span>Chi phí nghiệp vụ thực tế</span><b class="amount-out">${money(expense)}</b><small>Không gồm khách rút tiền</small></article><article class="report-card emphasis"><span>Lợi nhuận thu/chi nghiệp vụ</span><b>${money(income-expense)}</b><small>Thu đã xác nhận trừ chi nghiệp vụ</small></article><article class="report-card"><span>Khách hàng rút tiền</span><b class="amount-out">${money(withdrawal)}</b><small>Dòng tiền riêng, không tính là chi phí</small></article><article class="report-card"><span>Tiền đã thu</span><b class="amount-in">${money(income)}</b></article><article class="report-card emphasis"><span>Lợi nhuận dự kiến theo đơn</span><b>${money(revenue-costs)}</b><small>Doanh thu trừ chi phí dự kiến</small></article></div><div class="report-footnote">Khoảng ${escapeHTML(start)} đến ${escapeHTML(end)} (tối đa 1 năm, tính cả hai ngày). Khách rút tiền được thống kê riêng, không làm giảm lợi nhuận.</div>`;
 }
 function reportsView() {
+  if (state.reportMode === "range") return reportsRangeView();
   if (state.reportMode === "year") return reportsAnnualView();
   const rows = state.transactions.filter(t => String(t.transaction_date).slice(0, 7) === state.month);
   const paidRows = rows.filter(t => t.status === "paid");
