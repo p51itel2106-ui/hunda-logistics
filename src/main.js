@@ -1025,7 +1025,7 @@ async function enterApp() {
     const profile = await api(`customer_accounts?select=*&user_id=eq.${encodeURIComponent(state.user.id)}`);
     if (!profile?.length) return renderPending(state.user?.email);
     state.customerAccount = profile[0]; state.workspace = "customer"; await loadCustomerData(); await loadWalletSnapshot(); render(); startRealtime();
-  } catch (error) { fail(error); authShell("login", `Không tải được dữ liệu: ${error.message}`); }
+  } catch (error) { if (/đình chỉ|suspended|banned/i.test(error.message || "")) authShell("login", "Tài khoản tạm thời bị đình chỉ do sự cố. Vui lòng liên hệ quản trị viên."); else { fail(error); authShell("login", `Không tải được dữ liệu: ${error.message}`); } }
 }
 function bindAuth() {
   document.querySelectorAll("[data-auth-view]").forEach(b => b.addEventListener("click", () => authShell(b.dataset.authView)));
@@ -1040,7 +1040,7 @@ function bindAuth() {
       else if (view === "reset") await updatePassword(password);
       else await signIn(email, password);
     }
-    catch (error) { authShell(view, error.message); }
+    catch (error) { authShell(view, /banned|suspended/i.test(error.message || "") ? "Tài khoản tạm thời bị đình chỉ do sự cố. Vui lòng liên hệ quản trị viên." : error.message); }
   });
 }
 function bootstrap() {
