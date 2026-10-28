@@ -91,9 +91,7 @@ async function enforceIdleTimeout() {
     return;
   }
   if (Date.now() - last >= IDLE_TIMEOUT_MS) {
-    signOutInProgress = true;
-    try { await signOut(); }
-    finally { signOutInProgress = false; }
+    await signOut();
     authShell("login", "Phiên đăng nhập đã tự động kết thúc sau 10 phút không hoạt động.");
   }
 }
