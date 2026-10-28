@@ -4,7 +4,22 @@ const DB_URL = String(cfg.supabaseUrl || "").replace(/\/$/, "");
 const PUBLIC_KEY = cfg.publishableKey || "";
 const BUCKET = "hunda-documents";
 const SESSION_KEY = "hunda-auth-session";
-const state = { page: "dashboard", workspace: "admin", isAdmin: false, customerAccount: null, customerAccounts: [], managedAccounts: [], wallet: null, walletAdmin: null, walletAdminTab: "deposit", session: readSession(), user: null, customers: [], orders: [], customerOrders: [], transactions: [], transactionFilter: "all", documents: [], quotes: [], quoteImageUrls: {}, quoteDraft: { actual: "0", cbm: "0", convert: false, marketplace: "taobao", productUrl: "", productSku: "", productQuantity: "1", productNote: "", dirty: false }, activity: [], customerPage: "management", search: "", month: new Date().toISOString().slice(0, 7), realtime: null };
+const PERMISSION_ITEMS = [
+  ["dashboard", "Tổng quan", "Xem dashboard và chỉ số tóm tắt"],
+  ["orders", "Đơn hàng", "Xem, tạo, sửa, xóa và xuất dữ liệu đơn hàng"],
+  ["customers", "Khách hàng", "Quản lý hồ sơ khách hàng"],
+  ["transactions", "Thu chi", "Quản lý giao dịch thu và chi"],
+  ["reports", "Báo cáo tài chính", "Xem báo cáo và số liệu tài chính"],
+  ["documents", "Chứng từ", "Tải lên, xem và quản lý chứng từ"],
+  ["quotes", "Báo giá", "Xem yêu cầu và duyệt/chốt báo giá"],
+  ["activity", "Nhật ký thao tác", "Xem lịch sử thao tác hệ thống"],
+  ["accounts", "Quản lý tài khoản", "Cấp tài khoản và xem danh sách tài khoản"],
+  ["wallet", "Quản lý ví", "Duyệt nạp/rút và điều chỉnh số dư"]
+];
+const ALL_PERMISSIONS = Object.fromEntries(PERMISSION_ITEMS.map(([key]) => [key, true]));
+const hasPermission = key => state.permissions?.[key] === true;
+const requirePermission = key => { if (!hasPermission(key)) { showToast("Tài khoản của bạn chưa được cấp quyền cho chức năng này.", "error"); return false; } return true; };
+const state = { page: "dashboard", workspace: "admin", isAdmin: false, permissions: {}, customerAccount: null, customerAccounts: [], managedAccounts: [], wallet: null, walletAdmin: null, walletAdminTab: "deposit", session: readSession(), user: null, customers: [], orders: [], customerOrders: [], transactions: [], transactionFilter: "all", documents: [], quotes: [], quoteImageUrls: {}, quoteDraft: { actual: "0", cbm: "0", convert: false, marketplace: "taobao", productUrl: "", productSku: "", productQuantity: "1", productNote: "", dirty: false }, activity: [], customerPage: "management", search: "", month: new Date().toISOString().slice(0, 7), realtime: null };
 
 const walletPaymentTimers = new Map();
 
