@@ -82,7 +82,7 @@ Deno.serve(async (req: Request) => {
             company: profile?.billing_company || authUser.user_metadata?.billing_company || "",
             role: admin ? "admin" : "customer",
             permissions: admin?.permissions || {},
-            balance: Number(wallets.get(authUser.id)?.balance || 0),
+            ...(grantedPermissions.wallet === true ? { balance: Number(wallets.get(authUser.id)?.balance || 0) } : {}),
             active: admin ? admin.active && !authUser.banned_until : !authUser.banned_until,
             email_confirmed: Boolean(authUser.email_confirmed_at),
             created_at: authUser.created_at,
