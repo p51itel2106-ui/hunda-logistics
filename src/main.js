@@ -543,8 +543,8 @@ function customerQuotesPanel() {
     '<label class="quote-field"><span>Giá trị đơn hàng / sản phẩm (CNY) *</span><input id="quote-product-value" type="number" min="0" step="0.01" required value="' + escapeHTML(state.quoteDraft?.productValue ?? "") + '" inputmode="decimal" placeholder="Nhập giá trị sản phẩm"></label>' +
     '<label class="quote-field"><span>Khối lượng thực tế (kg, nếu đã biết)</span><input id="quote-kgs" type="number" min="0" step="0.001" value="' + escapeHTML(state.quoteDraft?.actual ?? "0") + '" inputmode="decimal"></label>' +
     '<label class="quote-field"><span>Thể tích hàng (CBM, nếu đã biết)</span><input id="quote-cbm" type="number" min="0" step="0.0001" value="' + escapeHTML(state.quoteDraft?.cbm ?? "0") + '" inputmode="decimal"></label></div>' +
-    '<p class="quote-formula">W = max(kg thực tế, CBM × 250). Tổng tạm tính = W × 6,97 CNY + 3% giá trị đơn hàng/sản phẩm. Nhập giá trị sản phẩm bằng CNY để xem tổng chính xác.</p>' +
-    '<div class="quote-calc-grid"><div><span>Kg quy đổi (CBM × 250)</span><b id="quote-volume-weight">0 kg</b></div><div><span>W · trọng lượng tính giá</span><b id="quote-chargeable-weight">0 kg</b></div><div><span>Phí vận chuyển (W × 6,97)</span><b id="quote-shipping-cny">—</b></div><div><span>Phí mua hộ/dịch vụ (3%)</span><b id="quote-service-cny">—</b></div><div class="quote-total"><span>Tổng tạm tính</span><b id="quote-estimate-cny">Chưa đủ dữ liệu</b></div></div>' +
+    '<p class="quote-formula">W = max(kg thực tế, CBM × 250). Giá vận chuyển tạm tính = W × 7 CNY, chưa bao gồm giá trị sản phẩm. Tổng tạm tính = phí vận chuyển + 3% giá trị đơn hàng/sản phẩm; nhập giá trị bằng CNY để tính đầy đủ.</p>' +
+    '<div class="quote-calc-grid"><div><span>Kg quy đổi (CBM × 250)</span><b id="quote-volume-weight">0 kg</b></div><div><span>W · trọng lượng tính giá</span><b id="quote-chargeable-weight">0 kg</b></div><div><span>Vận chuyển · W × 7 CNY<br><small>Chưa gồm giá trị sản phẩm</small></span><b id="quote-shipping-cny">—</b></div><div><span>Phí mua hộ/dịch vụ (3%)</span><b id="quote-service-cny">—</b></div><div class="quote-total"><span>Tổng tạm tính</span><b id="quote-estimate-cny">Chưa đủ dữ liệu</b></div></div>' +
     '<label class="quote-convert"><input id="quote-convert-vnd" type="checkbox" ' + (state.quoteDraft?.convert ? "checked" : "") + '><span>Hiển thị thêm VND theo tỷ giá 1 CNY = 3.950 VND</span></label>' +
     '<div class="quote-vnd-result" id="quote-vnd-result" hidden><span>Tổng tạm tính quy đổi · 3.950 VND/CNY</span><b id="quote-estimate-vnd">—</b></div>' +
     '<div class="quote-submit-row"><span>Hunda sẽ kiểm tra sản phẩm, phí mua hộ và vận chuyển rồi phản hồi báo giá.</span><button type="submit" class="btn primary">' + icon("arrow", 15) + ' Gửi yêu cầu</button></div></form>' +
@@ -577,7 +577,7 @@ function bindCustomerQuoteForm() {
     const productValueInput = form.querySelector("#quote-product-value");
     const productValueRaw = productValueInput.value.trim();
     const productValue = productValueRaw === "" ? null : Number(productValueRaw);
-    const shipping = Math.round((chargeable * 6.97 + Number.EPSILON) * 100) / 100;
+    const shipping = Math.round((chargeable * 7 + Number.EPSILON) * 100) / 100;
     const service = productValue === null ? null : Math.round((productValue * 0.03 + Number.EPSILON) * 100) / 100;
     const estimate = service === null ? null : shipping + service;
     form.querySelector("#quote-volume-weight").textContent = volumeWeight.toLocaleString("vi-VN", { maximumFractionDigits: 3 }) + " kg";
