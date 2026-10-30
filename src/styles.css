@@ -205,7 +205,7 @@ body{background:var(--canvas)}
 .quote-field input{height:42px;padding:0 12px;border:1px solid #dce4df;border-radius:7px;background:#fff;color:#172b3d;font:inherit}
 .quote-field input:focus{outline:2px solid rgba(244,119,22,.2);border-color:#f47716}
 .quote-formula{margin:12px 0;color:#77838a;font-size:10px;line-height:1.6}
-.quote-calc-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.quote-calc-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
 .quote-calc-grid>div{display:grid;gap:8px;padding:13px;border:1px solid #e8ece9;border-radius:8px;background:#fafbf9}
 .quote-calc-grid span,.quote-vnd-result span{font-size:10px;color:#78847e}
 .quote-calc-grid b{font-size:17px;color:#172b3d}
@@ -218,6 +218,7 @@ body{background:var(--canvas)}
 .quote-vnd-result b{font-size:16px;color:#3b8557}
 .quote-submit-row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding-top:12px;border-top:1px solid #eef0ed}
 .quote-submit-row>span{font-size:10px;color:#78847e}
+.quote-incomplete{color:#a46a15}
 .quote-history-heading{margin-top:22px;padding-top:18px;border-top:1px solid #edf0ed}
 .quote-status{display:inline-flex;padding:5px 8px;border-radius:20px;font-size:9px;font-weight:700;white-space:nowrap}
 .quote-status.pending{background:#fff4df;color:#a46a15}

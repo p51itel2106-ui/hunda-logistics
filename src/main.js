@@ -24,7 +24,7 @@ const PERMISSION_ITEMS = [
 const ALL_PERMISSIONS = Object.fromEntries(PERMISSION_ITEMS.map(([key]) => [key, true]));
 const hasPermission = key => state.permissions?.[key] === true;
 const requirePermission = key => { if (!hasPermission(key)) { showToast("Tài khoản của bạn chưa được cấp quyền cho chức năng này.", "error"); return false; } return true; };
-const state = { page: "dashboard", loginEvents: [], workspace: "admin", isAdmin: false, permissions: {}, customerAccount: null, customerAccounts: [], managedAccounts: [], wallet: null, walletAdmin: null, walletAdminTab: "deposit", session: readSession(), user: null, customers: [], orders: [], customerOrders: [], transactions: [], transactionFilter: "all", documents: [], quotes: [], quoteImageUrls: {}, quoteDraft: { actual: "0", cbm: "0", convert: false, marketplace: "taobao", productUrl: "", productSku: "", productQuantity: "1", productNote: "", dirty: false }, activity: [], customerPage: "management", customerFinanceExpanded: true, search: "", month: new Date().toISOString().slice(0, 7), reportMode: "month", reportStart: new Date().toISOString().slice(0, 8) + "01", reportEnd: new Date().toISOString().slice(0, 10), realtime: null };
+const state = { page: "dashboard", loginEvents: [], workspace: "admin", isAdmin: false, permissions: {}, customerAccount: null, customerAccounts: [], managedAccounts: [], wallet: null, walletAdmin: null, walletAdminTab: "deposit", session: readSession(), user: null, customers: [], orders: [], customerOrders: [], transactions: [], transactionFilter: "all", documents: [], quotes: [], quoteImageUrls: {}, quoteDraft: { actual: "0", cbm: "0", productValue: "", convert: false, marketplace: "taobao", productUrl: "", productSku: "", productQuantity: "1", productNote: "", dirty: false }, activity: [], customerPage: "management", customerFinanceExpanded: true, search: "", month: new Date().toISOString().slice(0, 7), reportMode: "month", reportStart: new Date().toISOString().slice(0, 8) + "01", reportEnd: new Date().toISOString().slice(0, 10), realtime: null };
 
 const walletPaymentTimers = new Map();
 
@@ -504,14 +504,29 @@ function documentsView() {
 function quoteCurrencyCny(value) {
   return new Intl.NumberFormat("vi-VN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(value) || 0) + " ¥";
 }
+function quoteEstimateParts(quote) {
+  const complete = quote.product_value_cny !== null && quote.product_value_cny !== undefined && quote.estimated_price_cny !== null && quote.estimated_price_cny !== undefined;
+  return {
+    complete,
+    shipping: complete ? Number(quote.shipping_price_cny) : null,
+    service: complete ? Number(quote.purchase_service_fee_cny) : null,
+    total: complete ? Number(quote.estimated_price_cny) : null
+  };
+}
+function quoteEstimateMarkup(quote, includeTotal = true) {
+  const parts = quoteEstimateParts(quote);
+  if (!parts.complete) return '<small class="subline quote-incomplete">Thiếu giá trị sản phẩm — chưa đủ dữ liệu tính tạm tính</small>';
+  return '<small class="subline">Vận chuyển: ' + quoteCurrencyCny(parts.shipping) + '</small><small class="subline">Phí mua hộ/dịch vụ (3%): ' + quoteCurrencyCny(parts.service) + '</small>' + (includeTotal ? '<small class="subline"><b>Tổng tạm tính: ' + quoteCurrencyCny(parts.total) + '</b></small>' : '');
+}
 function customerQuotesPanel() {
   const history = (state.quotes || []).map(q => {
     const approved = q.status === "approved";
-    const displayed = q.convert_to_vnd
-      ? money(approved ? Number(q.final_price_cny || 0) * 3950 : q.estimated_price_vnd)
-      : quoteCurrencyCny(approved ? q.final_price_cny : q.estimated_price_cny);
+    const parts = quoteEstimateParts(q);
+    const displayed = approved ? quoteCurrencyCny(q.final_price_cny) : parts.complete ? quoteCurrencyCny(parts.total) : "Chưa đủ dữ liệu";
     const status = approved ? "Đã chốt giá" : "Chờ Hunda duyệt";
-    const secondary = q.convert_to_vnd ? '<small class="subline">' + quoteCurrencyCny(approved ? q.final_price_cny : q.estimated_price_cny) + '</small>' : "";
+    const secondary = approved
+      ? (q.convert_to_vnd ? '<small class="subline">' + money(Number(q.final_price_cny) * 3950) + ' · 3.950 VND/CNY</small>' : '')
+      : quoteEstimateMarkup(q) + (q.convert_to_vnd && parts.complete ? '<small class="subline">' + money(parts.total * 3950) + ' · 3.950 VND/CNY</small>' : '');
     const note = q.admin_note ? '<small class="subline">Hunda: ' + escapeHTML(q.admin_note) + '</small>' : "";
     const item = q.product_url ? '<b>' + escapeHTML(q.marketplace || "Sản phẩm") + '</b><small class="subline"><a href="' + escapeHTML(q.product_url) + '" target="_blank" rel="noopener">Mở link sản phẩm</a></small><small class="subline">' + escapeHTML(q.product_sku || "Chưa chọn phân loại") + ' · SL ' + Number(q.product_quantity || 1) + '</small>' : "Vận chuyển";
     const image = state.quoteImageUrls?.[q.id] ? '<a href="' + escapeHTML(state.quoteImageUrls[q.id]) + '" target="_blank" rel="noopener">Xem ảnh</a>' : "";
@@ -525,12 +540,13 @@ function customerQuotesPanel() {
     '<label class="quote-field"><span>Số lượng</span><input id="quote-product-quantity" type="number" min="1" step="1" value="' + escapeHTML(state.quoteDraft?.productQuantity || "1") + '" required></label>' +
     '<label class="quote-field"><span>Ảnh sản phẩm (tùy chọn, tối đa 5 MB)</span><input id="quote-product-image" type="file" accept="image/png,image/jpeg,image/webp"></label>' +
     '<label class="quote-field"><span>Ghi chú sản phẩm</span><input id="quote-product-note" maxlength="1000" placeholder="Yêu cầu đóng gói hoặc lưu ý khác" value="' + escapeHTML(state.quoteDraft?.productNote || "") + '"></label>' +
+    '<label class="quote-field"><span>Giá trị đơn hàng / sản phẩm (CNY) *</span><input id="quote-product-value" type="number" min="0" step="0.01" required value="' + escapeHTML(state.quoteDraft?.productValue ?? "") + '" inputmode="decimal" placeholder="Nhập giá trị sản phẩm"></label>' +
     '<label class="quote-field"><span>Khối lượng thực tế (kg, nếu đã biết)</span><input id="quote-kgs" type="number" min="0" step="0.001" value="' + escapeHTML(state.quoteDraft?.actual ?? "0") + '" inputmode="decimal"></label>' +
     '<label class="quote-field"><span>Thể tích hàng (CBM, nếu đã biết)</span><input id="quote-cbm" type="number" min="0" step="0.0001" value="' + escapeHTML(state.quoteDraft?.cbm ?? "0") + '" inputmode="decimal"></label></div>' +
-    '<p class="quote-formula">Có thể gửi yêu cầu mua hộ chỉ bằng link sản phẩm. Nếu có cân nặng hoặc thể tích, hệ thống sẽ tính giá vận chuyển tạm tính.</p>' +
-    '<div class="quote-calc-grid"><div><span>Kg quy đổi (x)</span><b id="quote-volume-weight">0 kg</b></div><div><span>Trọng lượng tính giá</span><b id="quote-chargeable-weight">0 kg</b></div><div class="quote-total"><span>Giá tạm tính vận chuyển</span><b id="quote-estimate-cny">0,00 ¥</b></div></div>' +
+    '<p class="quote-formula">W = max(kg thực tế, CBM × 250). Tổng tạm tính = W × 6,97 CNY + 3% giá trị đơn hàng/sản phẩm. Nhập giá trị sản phẩm bằng CNY để xem tổng chính xác.</p>' +
+    '<div class="quote-calc-grid"><div><span>Kg quy đổi (CBM × 250)</span><b id="quote-volume-weight">0 kg</b></div><div><span>W · trọng lượng tính giá</span><b id="quote-chargeable-weight">0 kg</b></div><div><span>Phí vận chuyển (W × 6,97)</span><b id="quote-shipping-cny">—</b></div><div><span>Phí mua hộ/dịch vụ (3%)</span><b id="quote-service-cny">—</b></div><div class="quote-total"><span>Tổng tạm tính</span><b id="quote-estimate-cny">Chưa đủ dữ liệu</b></div></div>' +
     '<label class="quote-convert"><input id="quote-convert-vnd" type="checkbox" ' + (state.quoteDraft?.convert ? "checked" : "") + '><span>Hiển thị thêm VND theo tỷ giá 1 CNY = 3.950 VND</span></label>' +
-    '<div class="quote-vnd-result" id="quote-vnd-result" hidden><span>Giá tạm tính quy đổi</span><b id="quote-estimate-vnd">0 ₫</b></div>' +
+    '<div class="quote-vnd-result" id="quote-vnd-result" hidden><span>Tổng tạm tính quy đổi · 3.950 VND/CNY</span><b id="quote-estimate-vnd">—</b></div>' +
     '<div class="quote-submit-row"><span>Hunda sẽ kiểm tra sản phẩm, phí mua hộ và vận chuyển rồi phản hồi báo giá.</span><button type="submit" class="btn primary">' + icon("arrow", 15) + ' Gửi yêu cầu</button></div></form>' +
     '<div class="panel-heading quote-history-heading"><div><h2>Lịch sử yêu cầu</h2><p>Giá cuối cùng chỉ được áp dụng sau khi Hunda phê duyệt.</p></div></div>' +
     '<div class="table-wrap"><table><thead><tr><th>NGÀY GỬI</th><th>SẢN PHẨM</th><th>KG</th><th>CBM</th><th>KG TÍNH GIÁ</th><th>GIÁ</th><th>TRẠNG THÁI / PHẢN HỒI</th></tr></thead><tbody>' +
@@ -546,6 +562,7 @@ function bindCustomerQuoteForm() {
     const convertInput = form.querySelector("#quote-convert-vnd");
     state.quoteDraft = {
       ...state.quoteDraft, actual: actualInput.value, cbm: cbmInput.value, convert: convertInput.checked,
+      productValue: form.querySelector("#quote-product-value").value,
       marketplace: form.querySelector("#quote-marketplace").value,
       productUrl: form.querySelector("#quote-product-url").value,
       productSku: form.querySelector("#quote-product-sku").value,
@@ -557,11 +574,18 @@ function bindCustomerQuoteForm() {
     const cbm = Math.max(0, Number(cbmInput.value) || 0);
     const volumeWeight = cbm * 250;
     const chargeable = Math.max(actual, volumeWeight);
-    const estimate = chargeable * 7.75;
+    const productValueInput = form.querySelector("#quote-product-value");
+    const productValueRaw = productValueInput.value.trim();
+    const productValue = productValueRaw === "" ? null : Number(productValueRaw);
+    const shipping = Math.round((chargeable * 6.97 + Number.EPSILON) * 100) / 100;
+    const service = productValue === null ? null : Math.round((productValue * 0.03 + Number.EPSILON) * 100) / 100;
+    const estimate = service === null ? null : shipping + service;
     form.querySelector("#quote-volume-weight").textContent = volumeWeight.toLocaleString("vi-VN", { maximumFractionDigits: 3 }) + " kg";
     form.querySelector("#quote-chargeable-weight").textContent = chargeable.toLocaleString("vi-VN", { maximumFractionDigits: 3 }) + " kg";
-    form.querySelector("#quote-estimate-cny").textContent = quoteCurrencyCny(estimate);
-    form.querySelector("#quote-estimate-vnd").textContent = money(estimate * 3950);
+    form.querySelector("#quote-shipping-cny").textContent = quoteCurrencyCny(shipping);
+    form.querySelector("#quote-service-cny").textContent = service === null ? "Nhập giá trị sản phẩm" : quoteCurrencyCny(service);
+    form.querySelector("#quote-estimate-cny").textContent = estimate === null ? "Chưa đủ dữ liệu" : quoteCurrencyCny(estimate);
+    form.querySelector("#quote-estimate-vnd").textContent = estimate === null ? "—" : money(estimate * 3950);
     form.querySelector("#quote-vnd-result").hidden = !convertInput.checked;
   };
   form.querySelectorAll("input").forEach(input => input.addEventListener("input", () => refresh(true)));
@@ -571,9 +595,13 @@ function bindCustomerQuoteForm() {
     event.preventDefault();
     const actual = Number(form.querySelector("#quote-kgs").value) || 0;
     const cbm = Number(form.querySelector("#quote-cbm").value) || 0;
+    const productValueInput = form.querySelector("#quote-product-value");
+    const productValueRaw = productValueInput.value.trim();
+    const productValue = /^\d{1,12}(?:\.\d{1,2})?$/.test(productValueRaw) ? Number(productValueRaw) : NaN;
     const productUrl = form.querySelector("#quote-product-url").value.trim();
     const image = form.querySelector("#quote-product-image").files[0];
     if (actual <= 0 && cbm <= 0 && !productUrl) { showToast("Nhập link sản phẩm hoặc khối lượng/thể tích hàng.", "error"); return; }
+    if (!Number.isFinite(productValue) || productValue < 0) { productValueInput.focus(); showToast("Nhập giá trị đơn hàng/sản phẩm hợp lệ bằng CNY; có thể nhập 0 nếu không có giá trị sản phẩm.", "error"); return; }
     if (productUrl && !/^https:\/\//i.test(productUrl)) { showToast("Link sản phẩm phải bắt đầu bằng https://.", "error"); return; }
     if (image && (!["image/jpeg", "image/png", "image/webp"].includes(image.type) || image.size > 5 * 1024 * 1024)) { showToast("Ảnh phải là JPG, PNG hoặc WebP và tối đa 5 MB.", "error"); return; }
     const button = form.querySelector('[type="submit"]');
@@ -587,7 +615,7 @@ function bindCustomerQuoteForm() {
       }
       try {
         await api("customer_quotes?select=*", { method: "POST", headers: { Prefer: "return=representation" }, body: JSON.stringify({
-          actual_weight_kg: actual, volume_cbm: cbm, convert_to_vnd: form.querySelector("#quote-convert-vnd").checked,
+          actual_weight_kg: actual, volume_cbm: cbm, product_value_cny: productValue, convert_to_vnd: form.querySelector("#quote-convert-vnd").checked,
           marketplace: productUrl ? form.querySelector("#quote-marketplace").value : "other",
           product_url: productUrl || null, product_sku: form.querySelector("#quote-product-sku").value.trim() || null,
           product_quantity: Math.max(1, Number(form.querySelector("#quote-product-quantity").value) || 1),
@@ -597,7 +625,7 @@ function bindCustomerQuoteForm() {
         if (imagePath) await request("/storage/v1/object/" + BUCKET + "/" + imagePath.split("/").map(encodeURIComponent).join("/"), { method: "DELETE" }).catch(() => {});
         throw error;
       }
-      state.quoteDraft = { actual: "0", cbm: "0", convert: false, marketplace: "taobao", productUrl: "", productSku: "", productQuantity: "1", productNote: "", dirty: false };
+      state.quoteDraft = { actual: "0", cbm: "0", productValue: "", convert: false, marketplace: "taobao", productUrl: "", productSku: "", productQuantity: "1", productNote: "", dirty: false };
       await loadCustomerData(); render(); showToast("Đã gửi yêu cầu để Hunda kiểm tra và báo giá.");
     } catch (error) {
       fail(error); button.disabled = false; button.innerHTML = icon("arrow", 15) + " Gửi yêu cầu";
@@ -609,12 +637,13 @@ function quotesView() {
   const nameFor = userId => state.customerAccounts.find(c => c.user_id === userId)?.full_name || ("Khách hàng · " + String(userId || "").slice(0, 8));
   const pending = (state.quotes || []).filter(q => q.status === "pending").length;
   const rows = (state.quotes || []).map(q => {
-    const cny = quoteCurrencyCny(q.status === "approved" ? q.final_price_cny : q.estimated_price_cny);
-    const vnd = q.convert_to_vnd ? '<small class="subline">' + money(q.status === "approved" ? Number(q.final_price_cny || 0) * 3950 : q.estimated_price_vnd) + '</small>' : "";
+    const parts = quoteEstimateParts(q);
+    const cny = q.status === "approved" ? quoteCurrencyCny(q.final_price_cny) : parts.complete ? quoteCurrencyCny(parts.total) : "Chưa đủ dữ liệu";
+    const vnd = q.status === "approved" ? (q.convert_to_vnd ? '<small class="subline">' + money(Number(q.final_price_cny || 0) * 3950) + '</small>' : "") : quoteEstimateMarkup(q) + (q.convert_to_vnd && parts.complete ? '<small class="subline">' + money(parts.total * 3950) + ' · 3.950 VND/CNY</small>' : "");
     const status = q.status === "approved" ? '<span class="quote-status approved">Đã chốt giá</span>' : '<span class="quote-status pending">Chờ duyệt</span>';
     const action = q.status === "pending" ? '<button class="btn primary small" data-action="approve-quote" data-id="' + q.id + '">Chốt giá</button>' : '<button class="btn ghost small" data-action="approve-quote" data-id="' + q.id + '">Sửa giá</button>';
     const item = q.product_url ? '<b>' + escapeHTML(q.marketplace || "Sản phẩm") + '</b><small class="subline"><a href="' + escapeHTML(q.product_url) + '" target="_blank" rel="noopener">Mở sản phẩm</a> · SL ' + Number(q.product_quantity || 1) + '</small><small class="subline">' + escapeHTML(q.product_sku || "Chưa chọn phân loại") + '</small>' + (q.product_image_path && state.quoteImageUrls?.[q.id] ? '<small class="subline"><a href="' + escapeHTML(state.quoteImageUrls[q.id]) + '" target="_blank" rel="noopener">Xem ảnh</a></small>' : '') + (q.product_note ? '<small class="subline">' + escapeHTML(q.product_note) + '</small>' : '') : "Vận chuyển";
-    return '<tr><td><b>' + dateText(q.created_at) + '</b><small class="subline">#' + escapeHTML(String(q.id).slice(0, 8).toUpperCase()) + '</small></td><td><b>' + escapeHTML(nameFor(q.user_id)) + '</b></td><td>' + item + '</td><td>' + Number(q.actual_weight_kg).toLocaleString("vi-VN") + ' kg<small class="subline">' + Number(q.volume_cbm).toLocaleString("vi-VN") + ' CBM</small></td><td>' + Number(q.chargeable_weight_kg).toLocaleString("vi-VN") + ' kg</td><td><b>' + cny + '</b>' + vnd + '</td><td>' + status + '</td><td>' + action + '</td></tr>';
+    return '<tr><td><b>' + dateText(q.created_at) + '</b><small class="subline">#' + escapeHTML(String(q.id).slice(0, 8).toUpperCase()) + '</small></td><td><b>' + escapeHTML(nameFor(q.user_id)) + '</b></td><td>' + item + '<small class="subline">Giá trị sản phẩm: ' + (q.product_value_cny === null || q.product_value_cny === undefined ? "Chưa có" : quoteCurrencyCny(q.product_value_cny)) + '</small></td><td>' + Number(q.actual_weight_kg).toLocaleString("vi-VN") + ' kg<small class="subline">' + Number(q.volume_cbm).toLocaleString("vi-VN") + ' CBM</small></td><td>' + Number(q.chargeable_weight_kg).toLocaleString("vi-VN") + ' kg</td><td><b>' + cny + '</b>' + vnd + '</td><td>' + status + '</td><td>' + action + '</td></tr>';
   }).join("");
   return '<div class="stats-grid"><article class="stat-card"><div class="stat-top"><span>Chờ duyệt</span><i class="stat-icon amber">' + icon("clock", 17) + '</i></div><strong>' + pending + '</strong><small>Yêu cầu báo giá mới</small></article><article class="stat-card"><div class="stat-top"><span>Tổng yêu cầu</span><i class="stat-icon blue">' + icon("file", 17) + '</i></div><strong>' + (state.quotes || []).length + '</strong><small>Đồng bộ từ không gian khách hàng</small></article></div>' +
     '<section class="panel table-panel"><div class="panel-heading"><div><h2>Luồng yêu cầu báo giá</h2><p>Đơn mua hộ và vận chuyển từ khách hàng.</p></div></div><div class="table-wrap"><table><thead><tr><th>NGÀY GỬI</th><th>KHÁCH HÀNG</th><th>SẢN PHẨM / SỐ LƯỢNG</th><th>KG / CBM</th><th>KG TÍNH GIÁ</th><th>TẠM TÍNH / CHỐT</th><th>TRẠNG THÁI</th><th></th></tr></thead><tbody>' +
@@ -625,8 +654,9 @@ function quoteApprovalModal(id) {
   if (!quote) return;
   const isApproved = quote.status === "approved";
   const customer = state.customerAccounts.find(item => item.user_id === quote.user_id)?.full_name || "Khách hàng";
+  const estimateParts = quoteEstimateParts(quote);
   const finalPrice = isApproved ? quote.final_price_cny : quote.estimated_price_cny;
-  const finalVnd = isApproved ? Number(quote.final_price_cny || 0) * 3950 : quote.estimated_price_vnd;
+  const finalVnd = isApproved ? Number(quote.final_price_cny || 0) * 3950 : estimateParts.complete ? estimateParts.total * 3950 : null;
   const product = quote.product_url
     ? field("Nền tảng / sản phẩm", '<p>' + escapeHTML(quote.marketplace || "") + ' · <a href="' + escapeHTML(quote.product_url) + '" target="_blank" rel="noopener">Mở link sản phẩm</a></p>')
       + field("Phân loại / số lượng", "<p>" + escapeHTML(quote.product_sku || "Chưa chọn") + " · " + Number(quote.product_quantity || 1) + "</p>")
@@ -634,10 +664,12 @@ function quoteApprovalModal(id) {
       + (state.quoteImageUrls?.[quote.id] ? field("Ảnh sản phẩm", '<p><a href="' + escapeHTML(state.quoteImageUrls[quote.id]) + '" target="_blank" rel="noopener">Mở ảnh khách gửi</a></p>') : "")
     : "";
   const fields = field("Khách hàng", "<p>" + escapeHTML(customer) + "</p>") + product +
+    field("Giá trị sản phẩm / đơn hàng", "<p>" + (quote.product_value_cny === null || quote.product_value_cny === undefined ? "Chưa có dữ liệu" : quoteCurrencyCny(quote.product_value_cny)) + "</p>") +
     field("Trọng lượng tính giá", "<p>" + Number(quote.chargeable_weight_kg).toLocaleString("vi-VN") + " kg</p>") +
+    field("Tạm tính", quoteEstimateMarkup(quote).replaceAll("<small class=\"subline\">", "<p>").replaceAll("</small>", "</p>")) +
     textInput("final_price_cny", "Giá chốt (CNY) *", finalPrice, "Nhập giá chốt", "number", true) +
     textareaInput("admin_note", "Ghi chú gửi khách", quote.admin_note || "", "Thời hạn báo giá, điều kiện áp dụng...") +
-    field("Quy đổi", "<p>" + (quote.convert_to_vnd ? money(Number(finalVnd)) + " (tham khảo theo 3.950 VND/CNY)" : "Khách đang xem giá bằng CNY") + "</p>") +
+    field("Quy đổi", "<p>" + (!isApproved && !estimateParts.complete ? "Chưa đủ dữ liệu báo giá tạm tính" : quote.convert_to_vnd ? money(Number(finalVnd)) + " (tham khảo theo 3.950 VND/CNY)" : "Khách đang xem giá bằng CNY") + "</p>") +
     (isApproved ? field("Cập nhật", "<p>Khách hàng sẽ thấy giá mới ngay sau khi lưu.</p>") : "");
   openModal(isApproved ? "Điều chỉnh giá đã chốt" : "Phê duyệt và chốt báo giá", formShell("quote-approval", quote.id, fields), isApproved ? "Lưu giá mới" : "Duyệt và gửi giá");
 }
