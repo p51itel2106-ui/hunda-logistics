@@ -425,3 +425,13 @@ body{background:var(--canvas)}
 .account-status-locked{background:#f2eeee;color:#8f514a}
 .account-status-locked:hover{background:#f8e7e4}
 .wallet-adjust-button{min-width:142px}
+
+
+/* Use the supplied transparent logo directly on each page surface. */
+.brand-emblem{object-fit:contain;object-position:center;background:transparent;border-radius:0}
+.auth-brand{width:min(470px,100%);height:190px;margin:0 auto 20px;padding:0;background:transparent;box-shadow:none;display:grid;place-items:center}
+.auth-brand img{display:block;width:min(300px,78%);height:190px;max-height:none;object-fit:contain;object-position:center;border:0;border-radius:0;background:transparent}
+.auth-brand-copy{display:none}
+.setup-logo{width:min(260px,78%);height:145px;object-fit:contain;object-position:center;border:0;border-radius:0;background:transparent}
+@media(max-width:850px){.auth-brand{height:170px;margin-bottom:18px}.auth-brand img{height:170px}}
+@media(max-width:600px){.auth-brand{height:145px;margin-bottom:14px}.auth-brand img{width:min(250px,86%);height:145px}.setup-logo{height:130px}}
